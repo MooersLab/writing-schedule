@@ -78,21 +78,31 @@ The %s is replaced by the Monday of the week in ISO form, for
 example 2026-01-19, giving a file such as writing-2026-01-19.org."
   :type 'string)
 
-(defcustom writing-schedule-template-directory
-  (expand-file-name "templates" writing-schedule-directory)
+(defcustom writing-schedule-template-directory nil
   "Directory of saved context templates.
 Each template is an org file that already has the letters assigned
 in its table, for example a teaching week or a meeting week.
-`writing-schedule-new-week-from-template' reads from here."
-  :type 'directory)
+`writing-schedule-new-week-from-template' reads from here.
 
-(defcustom writing-schedule-table-directory
-  (expand-file-name "tables" writing-schedule-directory)
+When nil, it derives from `writing-schedule-directory' as a
+templates subdirectory, computed each time it is used, so setting
+`writing-schedule-directory' is enough and the load order does not
+matter.  Set this only to place templates somewhere else."
+  :type '(choice (const :tag "Derive from writing-schedule-directory" nil)
+                 directory))
+
+(defcustom writing-schedule-table-directory nil
   "Directory where the working table for each week is copied.
 `writing-schedule-new-week-from-template' places this week's copy of
 the chosen template here.  A subdirectory keeps these input tables
-out of the way of the dated schedule files and the agenda."
-  :type 'directory)
+out of the way of the dated schedule files and the agenda.
+
+When nil, it derives from `writing-schedule-directory' as a tables
+subdirectory, computed each time it is used, so setting
+`writing-schedule-directory' is enough.  Set this only to place the
+working tables somewhere else."
+  :type '(choice (const :tag "Derive from writing-schedule-directory" nil)
+                 directory))
 
 (defcustom writing-schedule-use-todo t
   "When non-nil, each generated event is a TODO headline.
@@ -241,11 +251,30 @@ according to `writing-schedule-file-format'."
   (writing-schedule-file-for-week
    (writing-schedule--week-monday (current-time))))
 
+(defun writing-schedule--template-directory ()
+  "Return the directory of saved templates.
+Use `writing-schedule-template-directory' when it is non-nil, otherwise
+derive a templates subdirectory from `writing-schedule-directory'.  The
+value is computed here rather than at load time, so setting the base
+directory works regardless of load order."
+  (if writing-schedule-template-directory
+      (expand-file-name writing-schedule-template-directory)
+    (expand-file-name "templates" writing-schedule-directory)))
+
+(defun writing-schedule--table-directory ()
+  "Return the directory of working tables.
+Use `writing-schedule-table-directory' when it is non-nil, otherwise
+derive a tables subdirectory from `writing-schedule-directory'."
+  (if writing-schedule-table-directory
+      (expand-file-name writing-schedule-table-directory)
+    (expand-file-name "tables" writing-schedule-directory)))
+
 (defun writing-schedule-table-file-for-week (monday-abs)
   "Return the working table path for the week beginning MONDAY-ABS.
-The file lives in `writing-schedule-table-directory'."
+The file lives in the directory returned by
+`writing-schedule--table-directory'."
   (expand-file-name (format "table-%s.org" (writing-schedule--iso-date monday-abs))
-                    writing-schedule-table-directory))
+                    (writing-schedule--table-directory)))
 
 (defun writing-schedule--timestamp (monday-abs offset start end)
   "Build an org active timestamp string for a block.
@@ -544,12 +573,12 @@ open that copy, and place point in the table so you can run
 placing the letters into a one-time choice per context, for example a
 teaching week, a meeting week, or a writing retreat."
   (interactive)
-  (let* ((tdir (expand-file-name writing-schedule-template-directory))
+  (let* ((tdir (writing-schedule--template-directory))
          (templates (and (file-directory-p tdir)
                          (directory-files tdir nil "\\.org\\'" t))))
     (unless templates
       (user-error "No templates found in %s.  Add filled table files there first"
-                  writing-schedule-template-directory))
+                  tdir))
     (let* ((choice (completing-read "Start this week from template: "
                                     (sort templates #'string<) nil t))
            (source (expand-file-name choice tdir))
@@ -588,11 +617,11 @@ so batch generation needs no prompts."
 ;;;###autoload
 (defun writing-schedule-batch-list-templates (&optional directory)
   "Print available templates to standard output, one per line.
-DIRECTORY defaults to `writing-schedule-template-directory'.  This is
-meant to be called from a shell through emacs --batch, so that people
-who do not use Emacs can still see which schedules are available.
-Return the list of template file names."
-  (let* ((dir (expand-file-name (or directory writing-schedule-template-directory)))
+DIRECTORY defaults to the directory returned by
+`writing-schedule--template-directory'.  This is meant to be called from
+a shell through emacs --batch, so that people who do not use Emacs can
+still see which schedules are available.  Return the template file names."
+  (let* ((dir (expand-file-name (or directory (writing-schedule--template-directory))))
          (files (and (file-directory-p dir)
                      (sort (directory-files dir nil "\\.org\\'" t) #'string<))))
     (if files
