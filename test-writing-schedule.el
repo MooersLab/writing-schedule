@@ -301,6 +301,42 @@ description is missing."
     (should (string-match-p "- A = 1\\.50 h (77)" summary))
     (should (string-match-p "- C = 1\\.50 h (Project C)" summary))))
 
+(ert-deftest writing-schedule/table-file-for-week/builds-path ()
+  "The working table path combines the table directory and the date."
+  (let ((writing-schedule-table-directory "/tmp/ws/tables"))
+    (should (string= (writing-schedule-table-file-for-week
+                      (calendar-absolute-from-gregorian '(1 19 2026)))
+                     "/tmp/ws/tables/table-2026-01-19.org"))))
+
+(ert-deftest writing-schedule/directory-accessors/derive-or-override ()
+  "The template and table directories derive from the base when nil,
+and are used verbatim when set, at call time and in any load order."
+  (let ((writing-schedule-directory "/tmp/base")
+        (writing-schedule-template-directory nil)
+        (writing-schedule-table-directory nil))
+    (should (string= (writing-schedule--template-directory) "/tmp/base/templates"))
+    (should (string= (writing-schedule--table-directory) "/tmp/base/tables"))
+    ;; Changing the base updates both, because they derive at call time.
+    (setq writing-schedule-directory "/tmp/other")
+    (should (string= (writing-schedule--template-directory) "/tmp/other/templates"))
+    (should (string= (writing-schedule--table-directory) "/tmp/other/tables"))
+    ;; An explicit value overrides the derivation.
+    (setq writing-schedule-template-directory "/custom/tpl"
+          writing-schedule-table-directory "/custom/tab")
+    (should (string= (writing-schedule--template-directory) "/custom/tpl"))
+    (should (string= (writing-schedule--table-directory) "/custom/tab"))))
+
+;;;; writing-schedule--legend-mapping
+
+(ert-deftest writing-schedule/legend-mapping/uses-legend-descriptions ()
+  "The batch mapping takes descriptions from the legend and leaves codes empty."
+  (let ((mapping (writing-schedule--legend-mapping
+                  '("A" "B") '(("A" . "Alpha") ("C" . "Gamma")))))
+    (should (equal (plist-get (car mapping) :letter) "A"))
+    (should (equal (plist-get (car mapping) :desc) "Alpha"))
+    (should (equal (plist-get (car mapping) :code) ""))
+    (should (equal (plist-get (cadr mapping) :desc) ""))))
+
 ;;;; writing-schedule-command-map
 
 (ert-deftest writing-schedule/command-map/binds-each-command ()
@@ -308,6 +344,7 @@ description is missing."
   (should (keymapp writing-schedule-command-map))
   (dolist (pair '(("g" . writing-schedule-generate)
                   ("t" . writing-schedule-insert-template)
+                  ("n" . writing-schedule-new-week-from-template)
                   ("o" . writing-schedule-open-week)
                   ("r" . writing-schedule-open-recent)
                   ("e" . writing-schedule-export-ics)
