@@ -2,11 +2,12 @@
 
 # Warning: still under construction. Not in MELPA yet.
 
+
 Turn a weekly writing-block table into org agenda events and an iCalendar
 file you can import into Outlook Web or any calendar application.
 
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
-![Tests](https://img.shields.io/badge/tests-62%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-63%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
@@ -78,30 +79,20 @@ Place `writing-schedule.el` on your load path and require it.
 
 ```elisp
 (add-to-list 'load-path "~/path/to/writing-schedule")
-
-;; Set the base directory BEFORE loading, so the templates/ and tables/
-;; subdirectories are derived from it.
-(setq writing-schedule-directory "~/org/writing-schedule/")
-
 (require 'writing-schedule)
+
+;; Where the weeks are archived.
+(setq writing-schedule-directory "~/org/writing-schedule/")
 
 ;; A timezone string keeps exported events anchored correctly.
 (setq org-icalendar-timezone "America/Chicago")
 ```
 
-The template and table directories default to `templates/` and `tables/`
-under `writing-schedule-directory`. They are derived only when the package
-loads, so if you set `writing-schedule-directory` *after* loading, for example
-in a `use-package` `:config` block, set these two explicitly as well:
-
-```elisp
-(setq writing-schedule-template-directory "~/org/writing-schedule/templates/")
-(setq writing-schedule-table-directory    "~/org/writing-schedule/tables/")
-```
-
-With `use-package`, the simplest fix is to set `writing-schedule-directory` in
-`:init`, which runs before the package loads, so the derived directories track
-it automatically.
+The template and table directories default to `templates/` and `tables/` under
+`writing-schedule-directory`, computed each time they are used, so setting the
+base directory is enough and the load order does not matter. Set
+`writing-schedule-template-directory` or `writing-schedule-table-directory` only
+when you want templates or working tables somewhere else.
 
 ## Running the package: a tutorial
 
