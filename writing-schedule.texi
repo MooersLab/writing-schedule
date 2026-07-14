@@ -192,15 +192,18 @@ Monday of the week in ISO form, giving a file such as
 
 @defvr {User Option} writing-schedule-template-directory
 The directory of saved context templates, each an org file whose table
-already has the letters assigned. The default is a @file{templates}
-subdirectory of @code{writing-schedule-directory}.
+already has the letters assigned. The default is nil, which derives a
+@file{templates} subdirectory of @code{writing-schedule-directory} each
+time it is used, so setting the base directory is enough and the load
+order does not matter. Set this only to place templates elsewhere.
 @end defvr
 
 @defvr {User Option} writing-schedule-table-directory
 The directory where @code{writing-schedule-new-week-from-template} copies
-this week's working table. The default is a @file{tables} subdirectory of
-@code{writing-schedule-directory}, which keeps input tables out of the
-way of the dated schedules and the agenda.
+this week's working table. The default is nil, which derives a
+@file{tables} subdirectory of @code{writing-schedule-directory}, keeping
+input tables out of the way of the dated schedules and the agenda. Set
+this only to place the working tables elsewhere.
 @end defvr
 
 @defvr {User Option} writing-schedule-use-todo
