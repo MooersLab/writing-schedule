@@ -1,0 +1,331 @@
+\input texinfo   @c -*-texinfo-*-
+@c %**start of header
+@setfilename writing-schedule.info
+@settitle Writing Schedule Manual
+@documentencoding UTF-8
+@documentlanguage en
+@c %**end of header
+
+@copying
+This manual documents writing-schedule.el, an Emacs package that turns a
+weekly writing-block table into org agenda events and an iCalendar file.
+
+Copyright @copyright{} 2026 Blaine Mooers.
+
+@quotation
+Permission is granted to copy, distribute, and modify this document
+under the terms of the GNU Free Documentation License, Version 1.3 or
+any later version published by the Free Software Foundation.
+@end quotation
+@end copying
+
+@dircategory Emacs
+@direntry
+* Writing Schedule: (writing-schedule). Weekly writing blocks to agenda and iCalendar.
+@end direntry
+
+@titlepage
+@title Writing Schedule Manual
+@subtitle From a weekly table to your agenda and calendar
+@author Blaine Mooers
+@page
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Writing Schedule
+
+@insertcopying
+@end ifnottex
+
+@menu
+* Introduction::                What the package does.
+* Installation::                Loading the package.
+* The Table Format::            How to write the weekly table.
+* Commands::                    The interactive commands.
+* Customization::               Variables you can set.
+* Key Bindings::                A suggested prefix keymap.
+* Calendar Sync::               Exporting to iCalendar and Outlook.
+* Command Line::                Using the package without Emacs.
+* Testing::                     Running the test suite.
+* Function Index::              Index of documented functions.
+* Variable Index::              Index of documented variables.
+@end menu
+
+@node Introduction
+@chapter Introduction
+
+You keep a weekly plan as an org table. Each row is a time block, each
+column after the first is a day, and each filled cell holds a letter (A,
+B, C, or D) that names the project worked on during that block. This
+package reads that table and writes a dated file of events for each
+week, so past weeks are archived rather than overwritten. Those events
+feed the org agenda, and org's own iCalendar exporter turns them into a
+file that Outlook Web or any calendar application can import.
+
+The table is a seating chart. You decide who sits where, meaning which
+project fills which block. The generator is the usher that walks the
+chart, stamps each seat with a real date and time, and hands the guest
+list to your calendar.
+
+@cindex related work
+The package @code{org-timeblock} gives org-agenda an interactive
+timeblock view of scheduled tasks. This package is complementary,
+because it generates and archives a week from a reusable template and
+exports it to iCalendar, rather than viewing timestamps that already
+exist, so the two pair well.
+
+@node Installation
+@chapter Installation
+
+Place @file{writing-schedule.el} on your load path and require it.
+
+@lisp
+(add-to-list 'load-path "~/path/to/writing-schedule")
+(require 'writing-schedule)
+
+;; Where the dated weekly files are archived.
+(setq writing-schedule-directory "~/org/writing-schedule/")
+
+;; A timezone string keeps exported events anchored correctly.
+(setq org-icalendar-timezone "America/Chicago")
+@end lisp
+
+The package depends only on Emacs 27.1 or later and on the built-in
+@code{org} and @code{ox-icalendar} libraries. No external packages are
+required to generate schedules or export calendars.
+
+@node The Table Format
+@chapter The Table Format
+
+A schedule table has one label column and one column per day. The first
+row names the days. Section header rows group the blocks. Time-block
+rows carry a time range in the label column and a project letter in each
+day cell that is in use. Legend rows at the bottom associate each letter
+with a description.
+
+@example
+| Time <l>    | M | Tu | W | Th | F | Sa |
+|-------------+---+----+---+----+---+----|
+| Generative: |   |    |   |    |   |    |
+| 04:00-05:30 | A | B  | A | B  | B |    |
+| 05:45-07:15 | A | B  | A | B  | B | B  |
+|-------------+---+----+---+----+---+----|
+| A:          |   |    |   |    |   |    |
+| B:          |   |    |   |    |   |    |
+@end example
+
+The parser is tolerant of irregular spacing and of single-digit hours,
+so @samp{9:15 - 10:45} and @samp{04:00-5:30} are both accepted. A cell
+letter may be lower case; it is normalized to upper case. An empty cell
+means that no block is scheduled for that day and time.
+
+@node Commands
+@chapter Commands
+
+@deffn Command writing-schedule-insert-template n
+Insert a blank weekly table for @var{n} projects, where @var{n} is
+clamped to the range one to four. The default time blocks come from
+@code{writing-schedule-default-slots}.
+@end deffn
+
+@deffn Command writing-schedule-generate
+Parse the table at point and write the schedule file. For each letter in
+use, you are prompted for a project code and a description. When the
+legend rows carry a description, it is offered as the default. You then
+pick any day inside the target week, and the command snaps back to that
+week's Monday. The command writes a dated file for that week, such as
+@file{writing-2026-01-19.org}, inside @code{writing-schedule-directory},
+optionally adds it to @code{org-agenda-files}, and offers to export an
+iCalendar file.
+@end deffn
+
+@deffn Command writing-schedule-export-ics &optional file
+Export @var{file}, or the current week's dated file when @var{file} is
+omitted, to an iCalendar file through org's @code{ox-icalendar} back-end.
+The @file{.ics} file is written beside the org file, so it is archived by
+week as well. Return the absolute path of the resulting file.
+@end deffn
+
+@deffn Command writing-schedule-add-to-agenda &optional file
+Add @var{file}, or the current week's dated file when @var{file} is
+omitted, to @code{org-agenda-files}. The operation is idempotent.
+@end deffn
+
+@deffn Command writing-schedule-open-week &optional pick-date
+Open an archived weekly file. By default, choose from the archived weeks
+with completion, listed newest first, so a recent week is quick to reach.
+With a prefix argument @var{pick-date}, or when nothing is archived yet,
+prompt for a date instead and open the file for the week that contains
+it.
+@end deffn
+
+@deffn Command writing-schedule-open-recent
+Open the most recent archived weekly file.
+@end deffn
+
+@deffn Command writing-schedule-new-week-from-template
+Start the current week from a saved context template. Choose a template
+from @code{writing-schedule-template-directory}, copy it to this week's
+working table in @code{writing-schedule-table-directory}, open that copy,
+and place point in the table so you can run
+@code{writing-schedule-generate} right away. The copy is separate from
+the template, so the library stays intact.
+@end deffn
+
+@node Customization
+@chapter Customization
+
+@defvr {User Option} writing-schedule-directory
+The directory that holds one dated schedule file per week. Each
+generated week is archived here under its own file.
+@end defvr
+
+@defvr {User Option} writing-schedule-file-format
+The format of a weekly file name. The @samp{%s} is replaced by the
+Monday of the week in ISO form, giving a file such as
+@file{writing-2026-01-19.org}. The default is @code{"writing-%s.org"}.
+@end defvr
+
+@defvr {User Option} writing-schedule-template-directory
+The directory of saved context templates, each an org file whose table
+already has the letters assigned. The default is a @file{templates}
+subdirectory of @code{writing-schedule-directory}.
+@end defvr
+
+@defvr {User Option} writing-schedule-table-directory
+The directory where @code{writing-schedule-new-week-from-template} copies
+this week's working table. The default is a @file{tables} subdirectory of
+@code{writing-schedule-directory}, which keeps input tables out of the
+way of the dated schedules and the agenda.
+@end defvr
+
+@defvr {User Option} writing-schedule-use-todo
+When non-nil, each generated event is a TODO headline, so the schedule
+file also serves as a source of TODO items. Set it to nil for cleaner
+iCalendar summaries. The default is @code{t}.
+@end defvr
+
+@defvr {User Option} writing-schedule-todo-keyword
+The keyword placed before each event when
+@code{writing-schedule-use-todo} is non-nil. The default is @code{"TODO"}.
+@end defvr
+
+@defvr {User Option} writing-schedule-add-to-agenda
+When non-nil, each generated dated file is added to
+@code{org-agenda-files}. The default is @code{t}.
+@end defvr
+
+@defvr {User Option} writing-schedule-default-slots
+The sections and time blocks used by
+@code{writing-schedule-insert-template}. Each element is a list whose
+head is a section name and whose tail is a list of time ranges.
+@end defvr
+
+@node Key Bindings
+@chapter Key Bindings
+
+The package ships a prefix keymap that puts the commands on single keys.
+
+@defvr {Variable} writing-schedule-command-map
+A keymap binding @kbd{g} to @code{writing-schedule-generate}, @kbd{t} to
+@code{writing-schedule-insert-template}, @kbd{o} to
+@code{writing-schedule-open-week}, @kbd{r} to
+@code{writing-schedule-open-recent}, @kbd{n} to
+@code{writing-schedule-new-week-from-template}, @kbd{e} to
+@code{writing-schedule-export-ics}, and @kbd{a} to
+@code{writing-schedule-add-to-agenda}.
+@end defvr
+
+Bind it under any prefix you like. When @kbd{C-c w} is already your
+writing prefix, nest it on a free key such as @kbd{c}.
+
+@lisp
+(with-eval-after-load 'writing-schedule
+  (keymap-set my-writing-prefix "c" writing-schedule-command-map))
+@end lisp
+
+After that, @kbd{C-c w c r} opens the most recent week, and
+@kbd{C-c w c o} opens a week by completion or, with a prefix argument, by
+date.
+
+@node Calendar Sync
+@chapter Calendar Sync
+
+Because the generated file holds ordinary org headlines with active
+timestamps, org's iCalendar exporter turns each block into a timed
+event. Run @code{writing-schedule-export-ics} to write the file, then
+import it into Outlook Web through @emph{Add calendar} and @emph{Upload
+from file}. The exporter writes a stable identifier into each headline,
+so re-importing an edited week updates the matching events rather than
+creating duplicates.
+
+To feed the agenda, add your task file, the archive directory
+@code{writing-schedule-directory}, and any project writing logs to
+@code{org-agenda-files}. Pointing the agenda at the directory picks up
+every dated week automatically, so all of them act as sources of TODO
+items and timed blocks.
+
+@node Command Line
+@chapter Command Line
+
+People who do not use Emacs can still produce a calendar from a template.
+The @file{writing-schedule.sh} script uses Emacs only as an engine and
+writes an iCalendar file for import into Apple Calendar or Outlook.
+
+@example
+./writing-schedule.sh list
+./writing-schedule.sh generate three-projects 2026-01-21
+./writing-schedule.sh deps
+@end example
+
+The @code{list} command prints the available templates. The
+@code{generate} command writes a dated schedule and an @file{.ics} file
+for the week that contains the given date. Paths are configured through
+the environment variables @env{WS_DIR}, @env{WS_TEMPLATE_DIR},
+@env{WS_OUT_DIR}, and @env{WS_TIMEZONE}. The script drives the two batch
+functions below, which can also be called directly through
+@command{emacs --batch}.
+
+@deffn Command writing-schedule-batch-list-templates &optional directory
+Print the available templates to standard output, one per line.
+@var{directory} defaults to @code{writing-schedule-template-directory}.
+@end deffn
+
+@deffn Command writing-schedule-batch-generate table week &optional out-dir
+Generate a dated schedule and an iCalendar file from @var{table} for the
+week that contains @var{week}. Letters are mapped to projects from the
+table's legend rows, so no prompts are needed. @var{out-dir} overrides
+@code{writing-schedule-directory}. For readable event titles, fill the
+legend rows of the template, because those descriptions become the event
+titles.
+@end deffn
+
+@node Testing
+@chapter Testing
+
+The package ships with an ERT test suite split into unit tests and
+integration tests, plus a Makefile. Run the whole suite with:
+
+@example
+make test
+@end example
+
+Run only one layer with @code{make test-unit} or
+@code{make test-integration}. Measure line coverage with
+@code{make coverage} after installing the test dependencies through
+@code{make install-test-deps}. See @file{README.md} for the full
+testing tutorial.
+
+@node Function Index
+@chapter Function Index
+@printindex fn
+
+@node Variable Index
+@chapter Variable Index
+@printindex vr
+
+@bye

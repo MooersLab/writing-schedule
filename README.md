@@ -4,8 +4,8 @@ Turn a weekly writing-block table into org agenda events and an iCalendar
 file you can import into Outlook Web or any calendar application.
 
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
-![Tests](https://img.shields.io/badge/tests-50%20passing-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-62%20passing-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 You keep a weekly plan as an org table. Each row is a time block, each
@@ -27,12 +27,22 @@ list to your calendar.
 - Prompt for a project code and description per letter, with legend rows
   supplying the defaults.
 - Total the weekly hours for each letter in a summary section.
+- Keep a library of context templates, and start any week from one in a keystroke.
+- Include a command-line script, so people who do not use Emacs can list templates and generate a calendar file.
 - Archive each week in its own dated file, such as `writing-2026-01-19.org`.
 - Feed the org agenda, optionally as TODO items.
 - Export to iCalendar with stable identifiers, so re-imports update
   events rather than duplicating them.
 - No external dependencies for normal use. Only Emacs and the built-in
   `org` and `ox-icalendar` libraries are required.
+
+## Related work
+
+[org-timeblock](https://github.com/ichernyshovvv/org-timeblock) gives org-agenda
+an interactive timeblock view of scheduled tasks. writing-schedule.el is
+complementary: it generates and archives a week from a reusable template and
+exports it to iCalendar, rather than viewing timestamps that already exist, so
+the two pair well.
 
 ## Requirements
 
@@ -45,8 +55,12 @@ list to your calendar.
 
 ```
 writing-schedule.el                        The package.
+writing-schedule.sh                        Command-line front end for non-Emacs users.
 writing-schedule-3-example.org             A filled three-project table.
+examples/three-projects.org                An example template to copy into your templates dir.
 writing-schedule/                          Archive directory of dated weekly files.
+  templates/                               Saved context templates (filled tables).
+  tables/                                  This week's working table, copied from a template.
 Makefile                                   Test, coverage, and lint targets.
 test/
   test-writing-schedule.el                 Unit tests.
@@ -144,6 +158,23 @@ M-x writing-schedule-open-week`, you instead pick any day from the date
 prompt and the command opens the file for the week that contains it. To
 jump straight to the latest week, run `M-x writing-schedule-open-recent`.
 
+### 6. Start a week from a saved template
+
+Keep a library of filled tables in `writing-schedule-template-directory`,
+one per context, for example `teaching-week.org`, `grant-deadline.org`,
+or `writing-retreat.org`. Each already has the letters assigned, so the
+weekly half hour of deciding where each project goes is done once.
+
+```
+M-x writing-schedule-new-week-from-template
+```
+
+Choose a template. The command copies it to this week's working table in
+`writing-schedule-table-directory`, opens that copy, and puts point in
+the table so you can adjust a few letters and run
+`writing-schedule-generate` right away. Because the copy is separate from
+the template, your library stays intact.
+
 ### Feeding the agenda
 
 Add your task file, the schedule file, and any project logs to the agenda
@@ -166,12 +197,14 @@ so all three become sources of TODO items and timed blocks.
 | `writing-schedule-add-to-agenda`   | Add the generated file to `org-agenda-files`     |
 | `writing-schedule-open-week`       | Open an archived week by completion, newest first, or by date with a prefix argument |
 | `writing-schedule-open-recent`     | Open the most recent archived week               |
+| `writing-schedule-new-week-from-template` | Copy a saved template into this week and open it, ready to generate |
 
 ## Key bindings
 
 The package ships a prefix keymap, `writing-schedule-command-map`, that
-puts the commands on single keys: `g` generate, `t` template, `o` open
-week, `r` open recent, `e` export ics, and `a` add to agenda. Bind it
+puts the commands on single keys: `g` generate, `t` template, `n` new
+week from template, `o` open week, `r` open recent, `e` export ics, and
+`a` add to agenda. Bind it
 under any prefix you like. When `C-c w` is already your writing prefix,
 nest it on a free key such as `c`.
 
@@ -193,6 +226,7 @@ adds which-key labels.
       "C-c w c"   "writing-schedule"
       "C-c w c g" "generate week"
       "C-c w c t" "insert template"
+      "C-c w c n" "new week from template"
       "C-c w c o" "open week"
       "C-c w c r" "open recent"
       "C-c w c e" "export ics"
@@ -201,6 +235,91 @@ adds which-key labels.
 
 After that, `C-c w c r` opens the most recent week, and `C-c w c o` opens
 a week by completion or, with a prefix argument, by date.
+
+### With straight.el
+
+If you manage packages with `straight.el`, choose one of the two forms
+below. Do not combine `:load-path` with a straight recipe, because they
+are two different ways to locate the package and they conflict. In both
+forms the settings sit in `:init` so they apply before the first `C-c w
+c` press, because `:bind-keymap` defers loading until you use the prefix.
+
+A local checkout that you edit yourself. Opt out of straight with
+`:straight nil` and load from your directory. This is the right choice
+while you are developing the package.
+
+```elisp
+(use-package writing-schedule
+  :straight nil
+  :load-path "~/src/writing-schedule"
+  :bind-keymap ("C-c w c" . writing-schedule-command-map)
+  :init
+  (setq writing-schedule-directory "~/org/writing-schedule/")
+  (setq org-icalendar-timezone "America/Chicago"))
+```
+
+Managed by straight from a published repository. Drop `:load-path` and
+give straight a git recipe (adjust the host and repo to yours).
+
+```elisp
+(use-package writing-schedule
+  :straight (writing-schedule :type git :host github :repo "MooersLab/writing-schedule")
+  :bind-keymap ("C-c w c" . writing-schedule-command-map)
+  :init
+  (setq writing-schedule-directory "~/org/writing-schedule/")
+  (setq org-icalendar-timezone "America/Chicago"))
+```
+
+## For non-Emacs users (command line)
+
+You do not need to know Emacs to get a calendar from a template. The
+`writing-schedule.sh` script uses Emacs only as an engine, and it produces an
+iCalendar (`.ics`) file that you can import into Apple Calendar or Outlook
+Calendar.
+
+List the available templates:
+
+```
+./writing-schedule.sh list
+```
+
+Generate a schedule and an `.ics` file for the week that contains a date:
+
+```
+./writing-schedule.sh generate three-projects 2026-01-21
+```
+
+The script prints the path of the `.ics` file. Import it:
+
+- Apple Calendar: File > Import..., choose the `.ics`, then pick a calendar.
+- Outlook (web): Add calendar > Upload from file, then choose the `.ics`.
+
+Configure paths through the environment:
+
+```
+WS_DIR            directory holding writing-schedule.el (default: the script's dir)
+WS_TEMPLATE_DIR   templates directory (default: ~/org/writing-schedule/templates)
+WS_OUT_DIR        output directory (default: ~/org/writing-schedule)
+WS_TIMEZONE       iCalendar timezone, for example America/Chicago (default: local)
+```
+
+Check dependencies. The script needs only Emacs, because org and ox-icalendar
+are built in:
+
+```
+./writing-schedule.sh deps
+```
+
+An example template is in `examples/three-projects.org`. Copy it into your
+templates directory to get started:
+
+```
+mkdir -p ~/org/writing-schedule/templates
+cp examples/three-projects.org ~/org/writing-schedule/templates/
+```
+
+For nicer calendar titles, fill the legend rows of a template with a short
+description per letter, because those descriptions become the event titles.
 
 ## Testing
 
@@ -275,7 +394,7 @@ make coverage EMACS_DIR=~/e30fewpackages
 ```
 
 For an HTML report, run `make coverage-html` and open `htmlcov/index.html`.
-The current suite reports 99 percent line coverage across 50 tests. The
+The current suite reports 100 percent line coverage across 62 tests. The
 `make coverage-check` target fails the build if coverage falls below 90
 percent, which suits a continuous-integration gate.
 

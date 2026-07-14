@@ -1,0 +1,289 @@
+#+TITLE: Writing Schedule (week of 2026-01-19)
+#+FILETAGS: :writing:
+#+LaTeX_HEADER: \usepackage[margin=0.5in]{geometry}
+
+# Letter to project map:
+#   A = 4231 (Generative drafting of the writing-prompts paper)
+#   B = 4232 (Rewriting the crystallography methods chapter)
+
+* Generative
+  :PROPERTIES:
+  :CATEGORY: Generative
+  :END:
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-19 Mon 04:00-05:30>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-20 Tue 04:00-05:30>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-21 Wed 04:00-05:30>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-22 Thu 04:00-05:30>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-23 Fri 04:00-05:30>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-19 Mon 05:45-07:15>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-20 Tue 05:45-07:15>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-21 Wed 05:45-07:15>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-22 Thu 05:45-07:15>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-23 Fri 05:45-07:15>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-24 Sat 05:45-07:15>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-19 Mon 07:30-09:00>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-20 Tue 07:30-09:00>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-21 Wed 07:30-09:00>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-22 Thu 07:30-09:00>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-23 Fri 07:30-09:00>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-24 Sat 07:30-09:00>
+* Rewriting
+  :PROPERTIES:
+  :CATEGORY: Rewriting
+  :END:
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-19 Mon 09:15-10:45>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-20 Tue 09:15-10:45>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-21 Wed 09:15-10:45>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-22 Thu 09:15-10:45>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-23 Fri 09:15-10:45>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-24 Sat 09:15-10:45>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-19 Mon 11:30-13:00>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-20 Tue 11:30-13:00>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-21 Wed 11:30-13:00>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-22 Thu 11:30-13:00>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-23 Fri 11:30-13:00>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-24 Sat 11:30-13:00>
+* Supporting
+  :PROPERTIES:
+  :CATEGORY: Supporting
+  :END:
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-19 Mon 13:15-14:45>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-20 Tue 13:15-14:45>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-21 Wed 13:15-14:45>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-22 Thu 13:15-14:45>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-23 Fri 13:15-14:45>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-24 Sat 13:15-14:45>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-19 Mon 15:00-16:30>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-20 Tue 15:00-16:30>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-21 Wed 15:00-16:30>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-22 Thu 15:00-16:30>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-23 Fri 15:00-16:30>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-24 Sat 15:00-16:30>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-19 Mon 16:45-18:15>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-20 Tue 16:45-18:15>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-21 Wed 16:45-18:15>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-22 Thu 16:45-18:15>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-23 Fri 16:45-18:15>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-24 Sat 16:45-18:15>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-19 Mon 20:30-22:00>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-20 Tue 20:30-22:00>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-21 Wed 20:30-22:00>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-22 Thu 20:30-22:00>
+** TODO Rewriting the crystallography methods chapter :B:
+   :PROPERTIES:
+   :WS_CODE: 4232
+   :END:
+   <2026-01-23 Fri 20:30-22:00>
+** TODO Generative drafting of the writing-prompts paper :A:
+   :PROPERTIES:
+   :WS_CODE: 4231
+   :END:
+   <2026-01-24 Sat 20:30-22:00>
+
+* Summary
+- A = 42.00 h (Generative drafting of the writing-prompts paper)
+- B = 37.50 h (Rewriting the crystallography methods chapter)

@@ -1,0 +1,51 @@
+#+Title: org-agenda-writing-week
+
+I'll design this as a small Emacs Lisp package, then actually build and test it so I can hand you working files plus a verified example. Let me set up first.Emacs 29.3 is available. Now I'll write the package.Now the example filled template (your 3-project table) and a batch test to verify the whole pipeline.Parsing and org generation worked (53 events, week Monday 2026-01-19). The ICS error is a batch-file quirk in my test driver, not the package: I let-bound the icalendar variables before `ox-icalendar` was loaded. The package itself requires `ox-icalendar` first. Let me verify the export path correctly through the package function.The export succeeded. Let me inspect the generated org file and the ICS to confirm they are correct and importable.Everything verified end to end: 53 calendar events with correct dates and times, per-project weekly hours (A = 42.00 h, B = 37.50 h), and clean VEVENTs whose CATEGORIES carry both the letter and the section. Let me fix the small quirk in the test driver, write a README, and package the deliverables.#+LaTeX_HEADER: \usepackage[margin=0.5in]{geometry}
+
+* Working package, built and tested
+
+I wrote =writing-schedule.el= and ran it against your three-project table inside Emacs 29.3. The run parsed 53 blocks, wrote =writing-schedule.org=, and exported =writing-schedule.ics= with 53 valid VEVENTs. So the whole path from table to calendar is verified, not just sketched.
+
+* The design in one analogy
+
+Your table is a seating chart. You decide who sits where, meaning which project fills which block. The generator is the usher that walks the chart, stamps each seat with a real date and time, and hands the guest list to your calendar. You keep authoring the plan the way you already do, and the code does the arithmetic of dates and the export.
+
+* How the pieces map to what you asked for
+
+- *Templates for one to four projects.* =writing-schedule-insert-template= drops a blank table with your default block times and the right number of legend rows.
+- *Letter to project mapping.* =writing-schedule-generate= reads the table at point, finds the letters actually used, and asks for a project code and description for each. If you filled the legend rows (A:, B:, C:), those descriptions become the defaults.
+- *Different hours per letter.* Each letter accumulates hours from the blocks you assign, so the loads differ on their own. A Summary section totals them. Your example gave A = 42.00 h and B = 37.50 h.
+- *Manual editing of overlaps.* The output is ordinary org headlines with active timestamps, so you edit a block by hand before exporting.
+- *Agenda sources.* Add =tasks.org=, =writing-schedule.org=, and a directory of project logs to =org-agenda-files=, and all three feed TODO items and timed blocks.
+- *iCalendar and Outlook.* This is the part worth flagging. Org already ships =ox-icalendar=, so I did not hand-roll the ICS format. =writing-schedule-export-ics= wraps it and writes stable UIDs into each headline, which means re-importing an edited week updates the matching Outlook events rather than duplicating them. In Outlook Web you import through /Add calendar/ then /Upload from file/.
+
+* One decision to make
+
+=writing-schedule-use-todo= defaults to t, which prefixes each event with TODO so the file doubles as a task source. If you would rather keep the calendar titles clean, set it to nil. The =.ics= summaries then carry only the project description.
+
+* Verified example numbers
+
+#+CAPTION: Result of running the tested three-project example for the week of 2026-01-19.
+#+ATTR_LATEX: :booktabs t
+#+NAME: tab:result
+| Quantity        | Value                    |
+|-----------------+--------------------------|
+| Blocks parsed   | 53                       |
+| VEVENTs written | 53                       |
+| Week Monday     | 2026-01-19               |
+| Hours for A     | 42.00                    |
+| Hours for B     | 37.50                    |
+
+* Suggested next steps
+
+#+begin_src org
+- [ ] Decide whether writing-schedule.org holds TODO items or stays a pure calendar
+- [ ] Add your logNNNN.org writing logs to org-agenda-files as a third source
+- [ ] Set org-icalendar-timezone in your init to America/Chicago
+- [ ] Try a Sunday-night scheduled export that rebuilds the coming week
+- [ ] Extend writing-schedule-default-slots if your block times shift
+#+end_src
+
+The =README.org= has installation, the four commands, and the full weekly workflow. Open =writing-schedule.el=, then run =M-x writing-schedule-insert-template= to see the round trip for yourself.
+
+One question that shapes where this goes next. Do you want each week to overwrite a single =writing-schedule.org=, or would you rather each week land in a dated file such as =writing-2026-01-19.org= that you archive? That choice affects how the agenda and the Outlook UIDs behave over a semester.
