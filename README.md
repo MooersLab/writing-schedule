@@ -1,8 +1,5 @@
 # writing-schedule.el
 
-# Warning: still under construction. Not in MELPA yet.
-
-
 Turn a weekly writing-block table into org agenda events and an iCalendar
 file you can import into Outlook Web or any calendar application.
 
@@ -307,10 +304,14 @@ Configure paths through the environment:
 
 ```
 WS_DIR            directory holding writing-schedule.el (default: the script's dir)
-WS_TEMPLATE_DIR   templates directory (default: ~/org/writing-schedule/templates)
 WS_OUT_DIR        output directory (default: ~/org/writing-schedule)
+WS_TEMPLATE_DIR   templates directory (default: WS_OUT_DIR/templates)
+WS_TABLE_DIR      working-table directory (default: WS_OUT_DIR/tables)
 WS_TIMEZONE       iCalendar timezone, for example America/Chicago (default: local)
 ```
+
+Set `WS_OUT_DIR` alone and the templates and tables directories follow it.
+Override `WS_TEMPLATE_DIR` or `WS_TABLE_DIR` only to place them elsewhere.
 
 Check dependencies. The script needs only Emacs, because org and ox-icalendar
 are built in:
