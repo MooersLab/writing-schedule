@@ -1,4 +1,6 @@
-# writing-schedule.el
+# writing-schedule.el 
+
+# Warning: still under construction. Not in MELPA yet.
 
 Turn a weekly writing-block table into org agenda events and an iCalendar
 file you can import into Outlook Web or any calendar application.
