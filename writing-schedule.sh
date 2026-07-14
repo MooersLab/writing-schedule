@@ -12,9 +12,17 @@ set -euo pipefail
 EMACS="${EMACS:-emacs}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WS_DIR="${WS_DIR:-$SCRIPT_DIR}"
-WS_TEMPLATE_DIR="${WS_TEMPLATE_DIR:-$HOME/org/writing-schedule/templates}"
 WS_OUT_DIR="${WS_OUT_DIR:-$HOME/org/writing-schedule}"
+# WS_TEMPLATE_DIR and WS_TABLE_DIR are empty by default and derive from
+# WS_OUT_DIR, so WS_OUT_DIR is the single directory knob.  Set either one
+# only to place templates or working tables somewhere else.
+WS_TEMPLATE_DIR="${WS_TEMPLATE_DIR:-}"
+WS_TABLE_DIR="${WS_TABLE_DIR:-}"
 WS_TIMEZONE="${WS_TIMEZONE:-}"
+
+# Effective directories used for path resolution and messages.
+TEMPLATE_DIR="${WS_TEMPLATE_DIR:-$WS_OUT_DIR/templates}"
+TABLE_DIR="${WS_TABLE_DIR:-$WS_OUT_DIR/tables}"
 
 usage() {
   cat <<EOF
@@ -39,8 +47,9 @@ Commands:
 Environment:
   EMACS            Emacs binary (default: emacs)
   WS_DIR           Directory holding writing-schedule.el (default: this script's dir)
-  WS_TEMPLATE_DIR  Templates directory (default: ~/org/writing-schedule/templates)
   WS_OUT_DIR       Output directory (default: ~/org/writing-schedule)
+  WS_TEMPLATE_DIR  Templates directory (default: WS_OUT_DIR/templates)
+  WS_TABLE_DIR     Working-table directory (default: WS_OUT_DIR/tables)
   WS_TIMEZONE      iCalendar timezone, for example America/Chicago (default: local)
 
 After generating, import the .ics file into your calendar:
@@ -86,8 +95,15 @@ run_emacs() {
   local expr="$1"
   local -a args=( -Q --batch -L "$WS_DIR"
     --eval "(require 'writing-schedule)"
-    --eval "(setq writing-schedule-template-directory \"$(esc "$WS_TEMPLATE_DIR")\")"
     --eval "(setq writing-schedule-directory \"$(esc "$WS_OUT_DIR")\")" )
+  # Set the derived directories only when the user pinned them, so that an
+  # unset value derives from writing-schedule-directory (WS_OUT_DIR).
+  if [ -n "$WS_TEMPLATE_DIR" ]; then
+    args+=( --eval "(setq writing-schedule-template-directory \"$(esc "$WS_TEMPLATE_DIR")\")" )
+  fi
+  if [ -n "$WS_TABLE_DIR" ]; then
+    args+=( --eval "(setq writing-schedule-table-directory \"$(esc "$WS_TABLE_DIR")\")" )
+  fi
   if [ -n "$WS_TIMEZONE" ]; then
     args+=( --eval "(setq org-icalendar-timezone \"$(esc "$WS_TIMEZONE")\")" )
   fi
@@ -123,8 +139,8 @@ resolve_table() {
   if [ -f "$arg" ]; then
     printf '%s/%s\n' "$(cd "$(dirname "$arg")" && pwd)" "$(basename "$arg")"; return 0
   fi
-  if [ -f "$WS_TEMPLATE_DIR/$arg" ]; then printf '%s/%s\n' "$WS_TEMPLATE_DIR" "$arg"; return 0; fi
-  if [ -f "$WS_TEMPLATE_DIR/$arg.org" ]; then printf '%s/%s.org\n' "$WS_TEMPLATE_DIR" "$arg"; return 0; fi
+  if [ -f "$TEMPLATE_DIR/$arg" ]; then printf '%s/%s\n' "$TEMPLATE_DIR" "$arg"; return 0; fi
+  if [ -f "$TEMPLATE_DIR/$arg.org" ]; then printf '%s/%s.org\n' "$TEMPLATE_DIR" "$arg"; return 0; fi
   return 1
 }
 
@@ -145,7 +161,7 @@ cmd_generate() {
   if ! table="$(resolve_table "$table_arg")"; then
     echo "Could not find template or file: $table_arg" >&2
     echo "Run 'writing-schedule.sh list' to see the templates in:" >&2
-    echo "  $WS_TEMPLATE_DIR" >&2
+    echo "  $TEMPLATE_DIR" >&2
     exit 1
   fi
   run_emacs "(writing-schedule-batch-generate \"$(esc "$table")\" \"$(esc "$week")\")"
