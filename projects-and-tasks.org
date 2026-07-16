@@ -1,0 +1,30 @@
+#+TITLE: Writing Schedule with Projects and Tasks
+
+| Time <l>      | M  | Tu | W  | Th | F  | Sa |
+|---------------+----+----+----+----+----+----|
+| Generative:   |    |    |    |    |    |    |
+| 04:00-05:30   | A  | B  | A  | B  | W  |    |
+| 05:45-07:15   | A  | B  | A  | B  | W  | A  |
+| 07:30-09:00   | EX | EX | EX | EX | EX |    |
+|---------------+----+----+----+----+----+----|
+| Rewriting:    |    |    |    |    |    |    |
+| 09:15-10:45   | B  | A  | B  | A  | TT | LC |
+| 11:30-13:00   | A  | B  | A  | LP | TP | A  |
+|---------------+----+----+----+----+----+----|
+| Supporting:   |    |    |    |    |    |    |
+| 08:15-08:45   | CM | CM | CM | CM | CM |    |
+| 13:15-14:45   | EM | EM | RT | EM | EM | EM |
+| 16:45-17:15   | CE | CE | CE | CE | CE |    |
+|---------------+----+----+----+----+----+----|
+| A:  DNPH1 docking          |  |  |  |  |  |
+| B:  DUSP1 radiation        |  |  |  |  |  |
+| W:  2026words              |  |  |  |  |  |
+| EX: exercise               |  |  |  |  |  |
+| LC: lawn care              |  |  |  |  |  |
+| EM: email                  |  |  |  |  |  |
+| RT: required training      |  |  |  |  |  |
+| TT: time tracking          |  |  |  |  |  |
+| CM: commute in morning     |  |  |  |  |  |
+| CE: commute in evening     |  |  |  |  |  |
+| LP: lecture prep           |  |  |  |  |  |
+| TP: talk prep              |  |  |  |  |  |
