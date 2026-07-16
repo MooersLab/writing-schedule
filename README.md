@@ -3,8 +3,9 @@
 Turn a weekly writing-block table into org agenda events and an iCalendar
 file you can import into Outlook Web or any calendar application.
 
+![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.1.0&color=blue)
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
-![Tests](https://img.shields.io/badge/tests-73%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-80%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
@@ -20,7 +21,7 @@ project fills which block. The generator is the usher that walks the
 chart, stamps each seat with a real date and time, and hands the guest
 list to your calendar.
 
-![From an edited table to timed blocks in org-agenda](imgs/writing-schedule-flow.png)
+![From an edited table to timed blocks in org-agenda](diagrams/writing-schedule-flow.png)
 
 *The pipeline: an edited table becomes a dated schedule file of
 timestamped headlines, which org-agenda shows as the week's timed
@@ -153,7 +154,7 @@ adds the file to your agenda and offers to export the iCalendar file.
 Each following week lands in its own file, so past weeks are archived
 rather than overwritten.
 
-![The prompts writing-schedule-generate asks, with sample responses](imgs/writing-schedule-prompts.png)
+![The prompts writing-schedule-generate asks, with sample responses](diagrams/writing-schedule-prompts.png)
 
 *The prompt sequence, with sample responses. The description default
 comes from the legend row, and the agenda step is automatic, because it
@@ -323,23 +324,34 @@ give straight a git recipe (adjust the host and repo to yours).
 ## For non-Emacs users (command line)
 
 You do not need to know Emacs to get a calendar from a template. The
-`writing-schedule.sh` script uses Emacs only as an engine, and it produces an
-iCalendar (`.ics`) file that you can import into Apple Calendar or Outlook
-Calendar.
+`writing-schedule.sh` script uses Emacs only as an engine, and it mirrors
+the package's capabilities, producing an iCalendar (`.ics`) file that you can
+import into Apple Calendar or Outlook Calendar.
 
-List the available templates:
-
-```
-./writing-schedule.sh list
-```
-
-Generate a schedule and an `.ics` file for the week that contains a date:
+The commands are:
 
 ```
-./writing-schedule.sh generate three-projects 2026-01-21
+./writing-schedule.sh list                       # list the templates
+./writing-schedule.sh weeks                      # list archived weeks, newest first
+./writing-schedule.sh template 4                 # print a blank 4-project template
+./writing-schedule.sh template 4 heavy.org       # or write it to a file
+./writing-schedule.sh generate three-projects 2026-01-21   # table + date -> schedule + .ics
+./writing-schedule.sh export writing-2026-01-19.org        # re-export a schedule to .ics
+./writing-schedule.sh save heavy.org grant-week  # save a table file into the library
+./writing-schedule.sh deps                       # check that Emacs is available
+./writing-schedule.sh help
 ```
 
-The script prints the path of the `.ics` file. Import it:
+A typical first run scaffolds a template, edits it in any text editor, then
+generates the week:
+
+```
+./writing-schedule.sh template 3 ~/org/writing-schedule/templates/teaching.org
+# edit teaching.org, fill each day cell with a letter, describe each in the legend
+./writing-schedule.sh generate teaching 2026-01-21
+```
+
+The `generate` and `export` commands print the path of the `.ics` file. Import it:
 
 - Apple Calendar: File > Import..., choose the `.ics`, then pick a calendar.
 - Outlook (web): Add calendar > Upload from file, then choose the `.ics`.
@@ -448,7 +460,7 @@ make coverage EMACS_DIR=~/e30fewpackages
 ```
 
 For an HTML report, run `make coverage-html` and open `htmlcov/index.html`.
-The current suite reports 100 percent line coverage across 73 tests. The
+The current suite reports 100 percent line coverage across 80 tests. The
 `make coverage-check` target fails the build if coverage falls below 90
 percent, which suits a continuous-integration gate.
 
