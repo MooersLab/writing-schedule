@@ -622,7 +622,7 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
           (org-mode)
           (goto-char (point-min))
           (search-forward "|")
-          (let ((dest (writing-schedule-save-template "meeting-week")))
+          (let ((dest (writing-schedule-save-template-table "meeting-week")))
             (should (file-exists-p dest))
             (should (string-suffix-p "meeting-week.org" dest))
             (let ((body (with-temp-buffer (insert-file-contents dest) (buffer-string))))
@@ -637,7 +637,7 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
     (org-mode)
     (insert "no table here\n")
     (goto-char (point-min))
-    (should-error (writing-schedule-save-template "x") :type 'user-error)))
+    (should-error (writing-schedule-save-template-table "x") :type 'user-error)))
 
 (ert-deftest writing-schedule/integration/save-template-title-from-name-and-empty ()
   "An empty name errors, and a buffer without a title gets its title from the name."
@@ -650,8 +650,8 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
           (org-mode)
           (goto-char (point-min))
           (search-forward "|")
-          (should-error (writing-schedule-save-template "  ") :type 'user-error)
-          (let* ((dest (writing-schedule-save-template "light.org"))
+          (should-error (writing-schedule-save-template-table "  ") :type 'user-error)
+          (let* ((dest (writing-schedule-save-template-table "light.org"))
                  (body (with-temp-buffer (insert-file-contents dest) (buffer-string))))
             (should (string-match-p "#\\+TITLE: light" body))))
       (delete-directory dir t))))
@@ -671,7 +671,7 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
             (goto-char (point-min))
             (search-forward "|")
             (cl-letf (((symbol-function 'y-or-n-p) (lambda (&rest _) nil)))
-              (should-error (writing-schedule-save-template "dup") :type 'user-error)))
+              (should-error (writing-schedule-save-template-table "dup") :type 'user-error)))
           (should (string-match-p "old content"
                                   (with-temp-buffer (insert-file-contents dest) (buffer-string)))))
       (delete-directory dir t))))
@@ -690,11 +690,116 @@ newline is still saved with one."
           (goto-char (point-min))
           (search-forward "|")
           (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "prompted")))
-            (let* ((dest (writing-schedule-save-template))
+            (let* ((dest (writing-schedule-save-template-table))
                    (body (with-temp-buffer (insert-file-contents dest) (buffer-string))))
               (should (string-suffix-p "prompted.org" dest))
               (should (string-suffix-p "\n" body)))))
       (delete-directory dir t))))
+
+(ert-deftest writing-schedule/integration/batch-insert-template ()
+  "Batch insert prints a template, or writes it to a file."
+  :tags '(integration)
+  (let ((out (with-output-to-string (writing-schedule-batch-insert-template 2))))
+    (should (string-match-p "for 2 Projects" out))
+    (should (string-match-p "| A: |" out))
+    (should (string-match-p "| B: |" out))
+    (should-not (string-match-p "| C: |" out)))
+  (let* ((dir (make-temp-file "ws-t" t))
+         (dest (expand-file-name "blank.org" dir)))
+    (unwind-protect
+        (progn
+          (with-output-to-string (writing-schedule-batch-insert-template 4 dest))
+          (should (file-exists-p dest))
+          (should (string-match-p "for 4 Projects"
+                                  (with-temp-buffer (insert-file-contents dest) (buffer-string)))))
+      (delete-directory dir t))))
+
+(ert-deftest writing-schedule/integration/batch-list-weeks ()
+  "Batch list-weeks prints dated files newest first and ignores others."
+  :tags '(integration)
+  (let ((dir (make-temp-file "ws-arch" t)))
+    (unwind-protect
+        (progn
+          (with-temp-file (expand-file-name "writing-2026-01-19.org" dir) (insert "x"))
+          (with-temp-file (expand-file-name "writing-2026-01-26.org" dir) (insert "x"))
+          (with-temp-file (expand-file-name "notes.org" dir) (insert "x"))
+          (let ((out (with-output-to-string (writing-schedule-batch-list-weeks dir))))
+            (should (string-match-p "writing-2026-01-26.org" out))
+            (should (string-match-p "writing-2026-01-19.org" out))
+            (should (< (string-match "2026-01-26" out) (string-match "2026-01-19" out)))
+            (should-not (string-match-p "notes.org" out))))
+      (delete-directory dir t))))
+
+(ert-deftest writing-schedule/integration/batch-list-weeks-empty ()
+  "Batch list-weeks reports when the archive is empty."
+  :tags '(integration)
+  (let* ((dir (make-temp-file "ws-arch" t))
+         (writing-schedule-directory dir))
+    (unwind-protect
+        (should (string-match-p "No archived weeks"
+                                (with-output-to-string (writing-schedule-batch-list-weeks))))
+      (delete-directory dir t))))
+
+(ert-deftest writing-schedule/integration/batch-save-template ()
+  "Batch save-template copies a table file into the library with a title."
+  :tags '(integration)
+  (let* ((tpl-dir (make-temp-file "ws-tpl" t))
+         (src-dir (make-temp-file "ws-src" t))
+         (writing-schedule-template-directory tpl-dir)
+         (src (expand-file-name "week.org" src-dir)))
+    (unwind-protect
+        (progn
+          (with-temp-file src (insert writing-schedule-test--example))
+          (let ((dest (with-temp-buffer
+                        (let ((standard-output (current-buffer)))
+                          (writing-schedule-batch-save-template src "grant-week")))))
+            (should (file-exists-p dest))
+            (should (string-suffix-p "grant-week.org" dest))
+            (let ((body (with-temp-buffer (insert-file-contents dest) (buffer-string))))
+              (should (string-match-p "#\\+TITLE: Writing Schedule for 3 Projects" body))
+              (should (string-match-p "20:30-22:00" body)))))
+      (delete-directory tpl-dir t)
+      (delete-directory src-dir t))))
+
+(ert-deftest writing-schedule/integration/batch-save-template-errors ()
+  "Batch save-template signals for a missing file, empty name, or no table."
+  :tags '(integration)
+  (let* ((tpl-dir (make-temp-file "ws-tpl" t))
+         (writing-schedule-template-directory tpl-dir))
+    (unwind-protect
+        (progn
+          (should-error (writing-schedule-batch-save-template "/no/such.org" "x"))
+          (let ((f (make-temp-file "ws" nil ".org")))
+            (unwind-protect
+                (progn
+                  (with-temp-file f (insert "| Time | M |\n|-\n| 04:00-05:30 | A |\n"))
+                  (should-error (writing-schedule-batch-save-template f "  ")))
+              (delete-file f)))
+          (let ((f (make-temp-file "ws" nil ".org")))
+            (unwind-protect
+                (progn
+                  (with-temp-file f (insert "no table here\n"))
+                  (should-error (writing-schedule-batch-save-template f "x")))
+              (delete-file f))))
+      (delete-directory tpl-dir t))))
+
+(ert-deftest writing-schedule/integration/batch-save-template-title-from-name ()
+  "When the source has no title, the template title comes from the name."
+  :tags '(integration)
+  (let* ((tpl-dir (make-temp-file "ws-tpl" t))
+         (src-dir (make-temp-file "ws-src" t))
+         (writing-schedule-template-directory tpl-dir)
+         (src (expand-file-name "raw.org" src-dir)))
+    (unwind-protect
+        (progn
+          (with-temp-file src (insert "| Time | M |\n|-\n| 04:00-05:30 | A |\n"))
+          (let ((dest (with-temp-buffer
+                        (let ((standard-output (current-buffer)))
+                          (writing-schedule-batch-save-template src "retreat")))))
+            (should (string-match-p "#\\+TITLE: retreat"
+                                    (with-temp-buffer (insert-file-contents dest) (buffer-string))))))
+      (delete-directory tpl-dir t)
+      (delete-directory src-dir t))))
 
 (provide 'test-writing-schedule-integration)
 ;;; test-writing-schedule-integration.el ends here
