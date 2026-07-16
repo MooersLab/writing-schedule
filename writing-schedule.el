@@ -1,7 +1,14 @@
 ;;; writing-schedule.el --- Generate agenda events and iCalendar from a weekly writing-block template -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Blaine Mooers and the Regents of the University of Oklahoma
+
 ;; Author: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Version: 0.1.0
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, version 3.
+
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: calendar, outlines, convenience
 
