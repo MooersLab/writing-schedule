@@ -561,5 +561,55 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
                           (mapcar #'expand-file-name org-agenda-files))))
       (delete-directory dir t))))
 
+(ert-deftest writing-schedule/integration/generate-from-template ()
+  "Selecting a saved table generates the dated schedule from it."
+  :tags '(integration)
+  (let* ((tpl-dir (make-temp-file "ws-tpl" t))
+         (out-dir (make-temp-file "ws-out" t))
+         (writing-schedule-template-directory tpl-dir)
+         (writing-schedule-directory out-dir)
+         (fixed-date (org-read-date nil t "2026-01-21"))
+         (answers '("100" "Alpha" "200" "Beta"))
+         (expected (writing-schedule-file-for-week
+                    (calendar-absolute-from-gregorian '(1 19 2026)))))
+    (unwind-protect
+        (progn
+          (with-temp-file (expand-file-name "meeting-week.org" tpl-dir)
+            (insert writing-schedule-test--example))
+          (cl-letf (((symbol-function 'completing-read) (lambda (&rest _) "meeting-week.org"))
+                    ((symbol-function 'read-string) (lambda (&rest _) (pop answers)))
+                    ((symbol-function 'org-read-date) (lambda (&rest _) fixed-date))
+                    ((symbol-function 'read-file-name) (lambda (&rest _) expected))
+                    ((symbol-function 'y-or-n-p) (lambda (&rest _) nil))
+                    ((symbol-function 'find-file) (lambda (&rest _) nil)))
+            (writing-schedule-generate-from-template))
+          (should (file-exists-p expected))
+          (let ((body (with-temp-buffer (insert-file-contents expected) (buffer-string))))
+            (should (string-match-p "#\\+TITLE: Writing Schedule (week of 2026-01-19)" body))
+            (should (string-match-p "<2026-01-19 Mon 04:00-05:30>" body))))
+      (delete-directory tpl-dir t)
+      (delete-directory out-dir t))))
+
+(ert-deftest writing-schedule/integration/generate-from-template-errors-when-empty ()
+  "The command signals when the template directory has no tables."
+  :tags '(integration)
+  (let* ((dir (make-temp-file "ws-tpl" t))
+         (writing-schedule-template-directory dir))
+    (unwind-protect
+        (should-error (writing-schedule-generate-from-template) :type 'user-error)
+      (delete-directory dir t))))
+
+(ert-deftest writing-schedule/integration/generate-from-template-errors-without-table ()
+  "The command signals when the chosen file has no org table."
+  :tags '(integration)
+  (let* ((dir (make-temp-file "ws-tpl" t))
+         (writing-schedule-template-directory dir))
+    (unwind-protect
+        (progn
+          (with-temp-file (expand-file-name "notes.org" dir) (insert "no table here\n"))
+          (cl-letf (((symbol-function 'completing-read) (lambda (&rest _) "notes.org")))
+            (should-error (writing-schedule-generate-from-template) :type 'user-error)))
+      (delete-directory dir t))))
+
 (provide 'test-writing-schedule-integration)
 ;;; test-writing-schedule-integration.el ends here
