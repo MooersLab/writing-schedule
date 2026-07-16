@@ -30,16 +30,26 @@ writing-schedule.sh - generate a writing schedule and a calendar file
 
 Usage:
   writing-schedule.sh list
+  writing-schedule.sh weeks
+  writing-schedule.sh template <1-4> [file]
   writing-schedule.sh generate <template-or-file> <date>
+  writing-schedule.sh export <schedule.org>
+  writing-schedule.sh save <table-file> <name>
   writing-schedule.sh deps [--install]
   writing-schedule.sh help
 
 Commands:
   list                          List the available templates (tables).
+  weeks                         List the archived weekly schedules, newest first.
+  template <1-4> [file]         Print a blank template for that many projects,
+                                or write it to <file> when given.
   generate <template> <date>    Generate a schedule and an .ics file for the
                                 week that contains <date> (YYYY-MM-DD).
                                 <template> is a name from 'list' or a path to
                                 an .org table file.
+  export <schedule.org>         Export an existing schedule file to .ics.
+  save <table-file> <name>      Save a table file into the template library
+                                under <name>.
   deps [--install]              Check dependencies. With --install, try to
                                 install Emacs with your system package manager.
   help                          Show this help.
@@ -149,6 +159,23 @@ cmd_list() {
   run_emacs "(writing-schedule-batch-list-templates)"
 }
 
+cmd_weeks() {
+  have_emacs || { install_emacs_hint; exit 1; }
+  run_emacs "(writing-schedule-batch-list-weeks)"
+}
+
+cmd_template() {
+  have_emacs || { install_emacs_hint; exit 1; }
+  local n="${1:-}"
+  local file="${2:-}"
+  if [ -z "$n" ]; then
+    echo "Usage: writing-schedule.sh template <1-4> [file]" >&2
+    echo "  With no file, the blank template is printed to standard output." >&2
+    exit 2
+  fi
+  run_emacs "(writing-schedule-batch-insert-template $(esc "$n") \"$(esc "$file")\")"
+}
+
 cmd_generate() {
   have_emacs || { install_emacs_hint; exit 1; }
   local table_arg="${1:-}"
@@ -171,12 +198,49 @@ cmd_generate() {
   echo "  Outlook (web):  Add calendar > Upload from file."
 }
 
+cmd_export() {
+  have_emacs || { install_emacs_hint; exit 1; }
+  local sched="${1:-}"
+  if [ -z "$sched" ]; then
+    echo "Usage: writing-schedule.sh export <schedule.org>" >&2
+    exit 2
+  fi
+  if [ ! -f "$sched" ]; then
+    echo "No such schedule file: $sched" >&2
+    exit 1
+  fi
+  local abs
+  abs="$(cd "$(dirname "$sched")" && pwd)/$(basename "$sched")"
+  run_emacs "(writing-schedule-export-ics \"$(esc "$abs")\")"
+}
+
+cmd_save() {
+  have_emacs || { install_emacs_hint; exit 1; }
+  local file="${1:-}"
+  local name="${2:-}"
+  if [ -z "$file" ] || [ -z "$name" ]; then
+    echo "Usage: writing-schedule.sh save <table-file> <name>" >&2
+    exit 2
+  fi
+  if [ ! -f "$file" ]; then
+    echo "No such table file: $file" >&2
+    exit 1
+  fi
+  local abs
+  abs="$(cd "$(dirname "$file")" && pwd)/$(basename "$file")"
+  run_emacs "(writing-schedule-batch-save-template \"$(esc "$abs")\" \"$(esc "$name")\")"
+}
+
 main() {
   local cmd="${1:-help}"
   shift || true
   case "$cmd" in
     list)           cmd_list "$@" ;;
+    weeks)          cmd_weeks "$@" ;;
+    template)       cmd_template "$@" ;;
     generate)       cmd_generate "$@" ;;
+    export)         cmd_export "$@" ;;
+    save)           cmd_save "$@" ;;
     deps)           check_deps "${1:-}" ;;
     help|-h|--help) usage ;;
     *) echo "Unknown command: $cmd" >&2; echo >&2; usage; exit 2 ;;
