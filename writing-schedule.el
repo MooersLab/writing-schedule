@@ -1,7 +1,7 @@
 ;;; writing-schedule.el --- Generate agenda events and iCalendar from a weekly writing-block template -*- lexical-binding: t; -*-
 
 ;; Author: Blaine Mooers <blaine-mooers@ou.edu>
-;; Version: 0.1
+;; Version: 0.1.0
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: calendar, outlines, convenience
 
@@ -467,27 +467,57 @@ the week to schedule."
           (mapconcat (lambda (_) "  |") (make-list nd t) "")
           "\n"))
 
+(defun writing-schedule--template-string (n)
+  "Return a blank weekly schedule template for N projects (1 to 4)."
+  (setq n (max 1 (min 4 (if (stringp n) (string-to-number n) n))))
+  (let* ((days '("M" "Tu" "W" "Th" "F" "Sa"))
+         (nd (length days))
+         (letters (seq-take '("A" "B" "C" "D") n)))
+    (concat
+     (format "#+TITLE: Writing Schedule for %d Project%s\n\n" n (if (= n 1) "" "s"))
+     "| Time <l> | " (mapconcat #'identity days " | ") " |\n"
+     "|-\n"
+     (mapconcat
+      (lambda (sec)
+        (concat (writing-schedule--blank-row (concat (car sec) ":") nd)
+                (mapconcat (lambda (slot) (writing-schedule--blank-row slot nd))
+                           (cdr sec) "")
+                "|-\n"))
+      writing-schedule-default-slots "")
+     (mapconcat (lambda (ltr) (writing-schedule--blank-row (concat ltr ":") nd))
+                letters "")
+     "|-\n")))
+
+(defun writing-schedule--table-title ()
+  "Return the buffer's \"#+TITLE:\" value, or nil when absent or empty."
+  (save-excursion
+    (goto-char (point-min))
+    (when (re-search-forward "^#\\+TITLE:[ \t]*\\(.*\\)$" nil t)
+      (let ((found (string-trim (match-string 1))))
+        (unless (string-empty-p found) found)))))
+
+(defun writing-schedule--template-dest (name)
+  "Return the destination path in the template directory for NAME.
+NAME may omit the .org extension."
+  (expand-file-name (if (string-suffix-p ".org" name) name (concat name ".org"))
+                    (writing-schedule--template-directory)))
+
+(defun writing-schedule--write-template (dest table title)
+  "Write TABLE with TITLE to DEST, creating the directory as needed.
+Return DEST."
+  (make-directory (file-name-directory dest) t)
+  (with-temp-file dest
+    (insert (format "#+TITLE: %s\n\n" title))
+    (insert table)
+    (unless (bolp) (insert "\n")))
+  dest)
+
 ;;;###autoload
 (defun writing-schedule-insert-template (n)
   "Insert a blank weekly schedule table for N projects (1 to 4)."
   (interactive "nNumber of writing projects (1-4): ")
-  (setq n (max 1 (min 4 n)))
-  (let* ((days '("M" "Tu" "W" "Th" "F" "Sa"))
-         (nd (length days))
-         (letters (seq-take '("A" "B" "C" "D") n))
-         (start (point)))
-    (insert (format "#+TITLE: Writing Schedule for %d Project%s\n\n"
-                    n (if (= n 1) "" "s")))
-    (insert (concat "| Time <l> | " (mapconcat #'identity days " | ") " |\n"))
-    (insert "|-\n")
-    (dolist (sec writing-schedule-default-slots)
-      (insert (writing-schedule--blank-row (concat (car sec) ":") nd))
-      (dolist (slot (cdr sec))
-        (insert (writing-schedule--blank-row slot nd)))
-      (insert "|-\n"))
-    (dolist (ltr letters)
-      (insert (writing-schedule--blank-row (concat ltr ":") nd)))
-    (insert "|-\n")
+  (let ((start (point)))
+    (insert (writing-schedule--template-string n))
     (goto-char start)
     (forward-line 2)
     (when (org-at-table-p) (org-table-align))))
@@ -653,24 +683,14 @@ legend row, for example a row whose first cell is \"A: my project\"."
   (let ((name (string-trim (or name (read-string "Save table as template named: ")))))
     (when (string-empty-p name)
       (user-error "A template name is required"))
-    (let* ((base (if (string-suffix-p ".org" name) name (concat name ".org")))
-           (dir (writing-schedule--template-directory))
-           (dest (expand-file-name base dir))
+    (let* ((dest (writing-schedule--template-dest name))
            (table (buffer-substring-no-properties (org-table-begin) (org-table-end)))
-           (title (or (save-excursion
-                        (goto-char (point-min))
-                        (when (re-search-forward "^#\\+TITLE:[ \t]*\\(.*\\)$" nil t)
-                          (let ((found (string-trim (match-string 1))))
-                            (unless (string-empty-p found) found))))
-                      (file-name-base base))))
+           (title (or (writing-schedule--table-title) (file-name-base dest))))
       (when (and (file-exists-p dest)
-                 (not (y-or-n-p (format "Template %s exists.  Overwrite it? " base))))
+                 (not (y-or-n-p (format "Template %s exists.  Overwrite it? "
+                                        (file-name-nondirectory dest)))))
         (user-error "Not saved"))
-      (make-directory dir t)
-      (with-temp-file dest
-        (insert (format "#+TITLE: %s\n\n" title))
-        (insert table)
-        (unless (bolp) (insert "\n")))
+      (writing-schedule--write-template dest table title)
       (message "Saved table to %s" dest)
       dest)))
 
@@ -740,6 +760,64 @@ Meant to be called from a shell through emacs --batch."
             (princ (format "Wrote schedule:  %s\n" org-file))
             (princ (format "Wrote iCalendar: %s\n" ics))
             ics))))))
+
+;;;###autoload
+(defun writing-schedule-batch-insert-template (n &optional file)
+  "Write or print a blank template for N projects.
+When FILE is non-empty, write the template there, otherwise print it to
+standard output.  Return the template text or the destination path.
+Meant to be called from a shell through emacs --batch."
+  (let ((text (writing-schedule--template-string n)))
+    (if (and file (not (string-empty-p file)))
+        (let ((dest (expand-file-name file)))
+          (make-directory (file-name-directory dest) t)
+          (with-temp-file dest (insert text))
+          (princ (format "Wrote template to %s\n" dest))
+          dest)
+      (princ text)
+      text)))
+
+;;;###autoload
+(defun writing-schedule-batch-list-weeks (&optional directory)
+  "Print archived weekly files to standard output, newest first.
+DIRECTORY overrides `writing-schedule-directory'.  Return the list of
+file names.  Meant to be called from a shell through emacs --batch."
+  (let* ((writing-schedule-directory
+          (if (and directory (not (string-empty-p directory)))
+              (expand-file-name directory)
+            writing-schedule-directory))
+         (weeks (writing-schedule--archived-weeks)))
+    (if weeks
+        (dolist (w weeks) (princ (format "%s\n" (file-name-nondirectory (cdr w)))))
+      (princ (format "No archived weeks in %s\n"
+                     (expand-file-name writing-schedule-directory))))
+    (mapcar (lambda (w) (file-name-nondirectory (cdr w))) weeks)))
+
+;;;###autoload
+(defun writing-schedule-batch-save-template (table-file name)
+  "Save the table in TABLE-FILE as a template named NAME.
+Write it into the template directory, wrapping it with the file's title
+or NAME, and overwrite silently.  Return the destination path.  Meant to
+be called from a shell through emacs --batch."
+  (let ((table-file (expand-file-name table-file))
+        (name (string-trim name)))
+    (unless (file-readable-p table-file)
+      (error "Cannot read table file: %s" table-file))
+    (when (string-empty-p name)
+      (error "A template name is required"))
+    (with-temp-buffer
+      (insert-file-contents table-file)
+      (org-mode)
+      (goto-char (point-min))
+      (unless (re-search-forward "^[ \t]*|" nil t)
+        (error "No org table found in %s" table-file))
+      (forward-line 0)
+      (let* ((dest (writing-schedule--template-dest name))
+             (table (buffer-substring-no-properties (org-table-begin) (org-table-end)))
+             (title (or (writing-schedule--table-title) (file-name-base dest))))
+        (writing-schedule--write-template dest table title)
+        (princ (format "Saved template to %s\n" dest))
+        dest))))
 
 ;;;; Suggested key map
 
