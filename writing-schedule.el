@@ -130,8 +130,9 @@ is a list of time ranges written as HH:MM-HH:MM."
 ;;;; Low-level parsing helpers
 
 (defconst writing-schedule--time-regexp
-  "\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)[ \t]*-+[ \t]*\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)"
-  "Match a start time and an end time inside a table label cell.")
+  "\\([0-9]\\{1,2\\}\\):[ \t]*\\([0-9]\\{2\\}\\)[ \t]*-+[ \t]*\\([0-9]\\{1,2\\}\\):[ \t]*\\([0-9]\\{2\\}\\)"
+  "Match a start time and an end time inside a table label cell.
+Whitespace after a colon is tolerated, so 16: 30 reads as 16:30.")
 
 (defconst writing-schedule--day-alist
   '(("m" . 0) ("mo" . 0) ("mon" . 0)
@@ -636,6 +637,43 @@ table and adjust a few letters before generating."
         (forward-line 0)
         (writing-schedule-generate)))))
 
+;;;###autoload
+(defun writing-schedule-save-template (&optional name)
+  "Save the org table at point as a template named NAME.
+Write it to the template directory, so you can later choose it with
+`writing-schedule-generate-from-template' or
+`writing-schedule-new-week-from-template'.  Use this to keep a table you
+have customized for a particular kind of week.  An existing
+\"#+TITLE:\" line in the buffer is preserved, otherwise the title is
+taken from NAME.  Put the project description in the first column of each
+legend row, for example a row whose first cell is \"A: my project\"."
+  (interactive)
+  (unless (org-at-table-p)
+    (user-error "Point is not in an org table.  Move into the table to save it"))
+  (let ((name (string-trim (or name (read-string "Save table as template named: ")))))
+    (when (string-empty-p name)
+      (user-error "A template name is required"))
+    (let* ((base (if (string-suffix-p ".org" name) name (concat name ".org")))
+           (dir (writing-schedule--template-directory))
+           (dest (expand-file-name base dir))
+           (table (buffer-substring-no-properties (org-table-begin) (org-table-end)))
+           (title (or (save-excursion
+                        (goto-char (point-min))
+                        (when (re-search-forward "^#\\+TITLE:[ \t]*\\(.*\\)$" nil t)
+                          (let ((found (string-trim (match-string 1))))
+                            (unless (string-empty-p found) found))))
+                      (file-name-base base))))
+      (when (and (file-exists-p dest)
+                 (not (y-or-n-p (format "Template %s exists.  Overwrite it? " base))))
+        (user-error "Not saved"))
+      (make-directory dir t)
+      (with-temp-file dest
+        (insert (format "#+TITLE: %s\n\n" title))
+        (insert table)
+        (unless (bolp) (insert "\n")))
+      (message "Saved table to %s" dest)
+      dest)))
+
 ;;;; Batch use from the command line
 
 (defun writing-schedule--legend-mapping (letters legend)
@@ -712,6 +750,7 @@ Meant to be called from a shell through emacs --batch."
     (define-key map "t" #'writing-schedule-insert-template)
     (define-key map "n" #'writing-schedule-new-week-from-template)
     (define-key map "f" #'writing-schedule-generate-from-template)
+    (define-key map "s" #'writing-schedule-save-template)
     (define-key map "o" #'writing-schedule-open-week)
     (define-key map "r" #'writing-schedule-open-recent)
     (define-key map "e" #'writing-schedule-export-ics)
@@ -724,8 +763,8 @@ writing prefix, the following places the commands under C-c w c:
   (keymap-set my-writing-prefix \"c\" writing-schedule-command-map)
 
 The keys are g generate, t template, n new week from template,
-f generate from a saved table, o open week, r open recent, e export ics,
-and a add to agenda.")
+f generate from a saved table, s save table as template, o open week,
+r open recent, e export ics, and a add to agenda.")
 
 (provide 'writing-schedule)
 ;;; writing-schedule.el ends here

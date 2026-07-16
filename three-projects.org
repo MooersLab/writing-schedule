@@ -3,20 +3,20 @@
 | Time <l>      | M | Tu | W | Th | F | Sa |
 |---------------+---+----+---+----+---+----|
 | Generative:   |   |    |   |    |   |    |
-| 04:00-5:30    | A | B  | A | B  | B |    |
+| 04:00-05:30   | A | B  | A | B  | B |    |
 | 05:45-07:15   | A | B  | A | B  | B | B  |
 | 07:30-09:00   | B | A  | A | A  | A | B  |
 |---------------+---+----+---+----+---+----|
 | Rewriting:    |   |    |   |    |   |    |
-| 9:15 - 10:45  | B | A  | A | A  | A | B  |
-| 11:30 - 13:00 | A | B  | A | A  | B | A  |
+| 09:15-10:45   | B | A  | A | A  | A | B  |
+| 11:30-13:00   | A | B  | A | A  | B | A  |
 |---------------+---+----+---+----+---+----|
-| Supporting    |   |    |   |    |   |    |
+| Supporting:   |   |    |   |    |   |    |
 | 13:15-14:45   | A | B  | A | B  | A | A  |
-| 15:00- 16:30  | A | B  | A | B  | A | A  |
+| 15:00-16:30   | A | B  | A | B  | A | A  |
 | 16:45-18:15   | B | B  | B | B  | A | A  |
 | 20:30-22:00   | B | A  | B | B  | B | A  |
 |---------------+---+----+---+----+---+----|
-| A:            | Generative drafting of the writing-prompts paper |   |   |   |   |   |
-| B:            | Rewriting the crystallography methods chapter    |   |   |   |   |   |
-| C:            | Supporting scripts and figures                   |   |   |   |   |   |
+| A: Generative drafting of the writing-prompts paper |   |   |   |   |   |
+| B: Rewriting the crystallography methods chapter    |   |   |   |   |   |
+| C: Supporting scripts and figures                   |   |   |   |   |   |

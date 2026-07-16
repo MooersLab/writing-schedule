@@ -105,7 +105,9 @@ A schedule table has one label column and one column per day. The first
 row names the days. Section header rows group the blocks. Time-block
 rows carry a time range in the label column and a project letter in each
 day cell that is in use. Legend rows at the bottom associate each letter
-with a description.
+with a description, which goes in the first column after the letter and
+the colon, such as @samp{A: docking}. That description becomes the event
+title.
 
 @example
 | Time <l>    | M | Tu | W | Th | F | Sa |
@@ -114,14 +116,15 @@ with a description.
 | 04:00-05:30 | A | B  | A | B  | B |    |
 | 05:45-07:15 | A | B  | A | B  | B | B  |
 |-------------+---+----+---+----+---+----|
-| A:          |   |    |   |    |   |    |
-| B:          |   |    |   |    |   |    |
+| A: docking  |   |    |   |    |   |    |
+| B: radiation|   |    |   |    |   |    |
 @end example
 
 The parser is tolerant of irregular spacing and of single-digit hours,
-so @samp{9:15 - 10:45} and @samp{04:00-5:30} are both accepted. A cell
-letter may be lower case; it is normalized to upper case. An empty cell
-means that no block is scheduled for that day and time.
+so @samp{9:15 - 10:45}, @samp{04:00-5:30}, and even @samp{15:00-16: 30}
+with a space after the colon are all accepted. A cell letter may be lower
+case; it is normalized to upper case. An empty cell means that no block
+is scheduled for that day and time.
 
 @node Commands
 @chapter Commands
@@ -184,6 +187,15 @@ usual prompts for the project mapping and the week. The saved table is
 read but not modified. Use this when a table already matches the coming
 week, and use @code{writing-schedule-new-week-from-template} when you
 want to copy a table and edit a few letters first.
+@end deffn
+
+@deffn Command writing-schedule-save-template &optional name
+Save the org table at point as a template named NAME in the template
+directory, so a table you have customized for a particular kind of week
+joins the library. An existing @code{#+TITLE:} line is preserved,
+otherwise the title is taken from NAME. Put the project description in
+the first column of each legend row, for example a first cell of
+@code{A: docking}.
 @end deffn
 
 @node Customization

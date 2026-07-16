@@ -4,7 +4,7 @@ Turn a weekly writing-block table into org agenda events and an iCalendar
 file you can import into Outlook Web or any calendar application.
 
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
-![Tests](https://img.shields.io/badge/tests-66%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-73%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
@@ -118,13 +118,16 @@ this once filled.
 | 04:00-05:30 | A | B  | A | B  | B |    |
 | 05:45-07:15 | A | B  | A | B  | B | B  |
 |-------------+---+----+---+----+---+----|
-| A:          |   |    |   |    |   |    |
-| B:          |   |    |   |    |   |    |
+| A: docking  |   |    |   |    |   |    |
+| B: radiation|   |    |   |    |   |    |
 ```
 
-The parser tolerates irregular spacing and single-digit hours, so
-`9:15 - 10:45` and `04:00-5:30` both work. A lower-case cell letter is
-normalized to upper case.
+Put a short project description in the first column of each legend row,
+after the letter and colon, for example a first cell of `A: docking`.
+That description becomes the event title. The parser tolerates irregular
+spacing and single-digit hours, so `9:15 - 10:45`, `04:00-5:30`, and even
+`15:00-16: 30` all work, and a lower-case cell letter is normalized to
+upper case.
 
 ### 3. Generate the schedule
 
@@ -195,6 +198,16 @@ This lists your saved tables, and after you pick one it generates the
 dated schedule of events for the org agenda directly, prompting for the
 project mapping and the week. It reads the table without changing it.
 
+To keep a table you have customized for a particular kind of week, put
+point in the table and run:
+
+```
+M-x writing-schedule-save-template
+```
+
+It prompts for a name and writes the table to your template directory, so
+it joins the library for later use.
+
 ### Feeding the agenda
 
 Add your task file, the schedule file, and any project logs to the agenda
@@ -219,13 +232,14 @@ so all three become sources of TODO items and timed blocks.
 | `writing-schedule-open-recent`     | Open the most recent archived week               |
 | `writing-schedule-new-week-from-template` | Copy a saved template into this week and open it, ready to generate |
 | `writing-schedule-generate-from-template` | Select a saved table and generate the schedule from it directly |
+| `writing-schedule-save-template`          | Save the edited table at point as a named template |
 
 ## Key bindings
 
 The package ships a prefix keymap, `writing-schedule-command-map`, that
 puts the commands on single keys: `g` generate, `t` template, `n` new
-week from template, `f` generate from a saved table, `o` open week, `r`
-open recent, `e` export ics, and `a` add to agenda. Bind it
+week from template, `f` generate from a saved table, `s` save table as template, `o` open
+week, `r` open recent, `e` export ics, and `a` add to agenda. Bind it
 under any prefix you like. When `C-c w` is already your writing prefix,
 nest it on a free key such as `c`.
 
@@ -249,6 +263,7 @@ adds which-key labels.
       "C-c w c t" "insert template"
       "C-c w c n" "new week from template"
       "C-c w c f" "generate from table"
+      "C-c w c s" "save table as template"
       "C-c w c o" "open week"
       "C-c w c r" "open recent"
       "C-c w c e" "export ics"
@@ -420,7 +435,7 @@ make coverage EMACS_DIR=~/e30fewpackages
 ```
 
 For an HTML report, run `make coverage-html` and open `htmlcov/index.html`.
-The current suite reports 100 percent line coverage across 66 tests. The
+The current suite reports 100 percent line coverage across 73 tests. The
 `make coverage-check` target fails the build if coverage falls below 90
 percent, which suits a continuous-integration gate.
 

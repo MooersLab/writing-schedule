@@ -611,5 +611,90 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
             (should-error (writing-schedule-generate-from-template) :type 'user-error)))
       (delete-directory dir t))))
 
+(ert-deftest writing-schedule/integration/save-template-writes ()
+  "Saving the table at point writes a named template, preserving the title."
+  :tags '(integration)
+  (let* ((dir (make-temp-file "ws-tpl" t))
+         (writing-schedule-template-directory dir))
+    (unwind-protect
+        (with-temp-buffer
+          (insert writing-schedule-test--example)
+          (org-mode)
+          (goto-char (point-min))
+          (search-forward "|")
+          (let ((dest (writing-schedule-save-template "meeting-week")))
+            (should (file-exists-p dest))
+            (should (string-suffix-p "meeting-week.org" dest))
+            (let ((body (with-temp-buffer (insert-file-contents dest) (buffer-string))))
+              (should (string-match-p "#\\+TITLE: Writing Schedule for 3 Projects" body))
+              (should (string-match-p "20:30-22:00" body)))))
+      (delete-directory dir t))))
+
+(ert-deftest writing-schedule/integration/save-template-errors-outside-table ()
+  "Saving refuses when point is not in an org table."
+  :tags '(integration)
+  (with-temp-buffer
+    (org-mode)
+    (insert "no table here\n")
+    (goto-char (point-min))
+    (should-error (writing-schedule-save-template "x") :type 'user-error)))
+
+(ert-deftest writing-schedule/integration/save-template-title-from-name-and-empty ()
+  "An empty name errors, and a buffer without a title gets its title from the name."
+  :tags '(integration)
+  (let* ((dir (make-temp-file "ws-tpl" t))
+         (writing-schedule-template-directory dir))
+    (unwind-protect
+        (with-temp-buffer
+          (insert "| Time <l> | M |\n|-\n| Gen: |  |\n| 04:00-05:30 | A |\n")
+          (org-mode)
+          (goto-char (point-min))
+          (search-forward "|")
+          (should-error (writing-schedule-save-template "  ") :type 'user-error)
+          (let* ((dest (writing-schedule-save-template "light.org"))
+                 (body (with-temp-buffer (insert-file-contents dest) (buffer-string))))
+            (should (string-match-p "#\\+TITLE: light" body))))
+      (delete-directory dir t))))
+
+(ert-deftest writing-schedule/integration/save-template-declines-overwrite ()
+  "Declining the overwrite keeps the existing template."
+  :tags '(integration)
+  (let* ((dir (make-temp-file "ws-tpl" t))
+         (writing-schedule-template-directory dir)
+         (dest (expand-file-name "dup.org" dir)))
+    (unwind-protect
+        (progn
+          (with-temp-file dest (insert "old content\n"))
+          (with-temp-buffer
+            (insert "| Time <l> | M |\n|-\n| Gen: |  |\n| 04:00-05:30 | A |\n")
+            (org-mode)
+            (goto-char (point-min))
+            (search-forward "|")
+            (cl-letf (((symbol-function 'y-or-n-p) (lambda (&rest _) nil)))
+              (should-error (writing-schedule-save-template "dup") :type 'user-error)))
+          (should (string-match-p "old content"
+                                  (with-temp-buffer (insert-file-contents dest) (buffer-string)))))
+      (delete-directory dir t))))
+
+(ert-deftest writing-schedule/integration/save-template-interactive-and-newline ()
+  "The name can be read interactively, and a table without a trailing
+newline is still saved with one."
+  :tags '(integration)
+  (let* ((dir (make-temp-file "ws-tpl" t))
+         (writing-schedule-template-directory dir))
+    (unwind-protect
+        (with-temp-buffer
+          ;; No trailing newline after the last table row.
+          (insert "| Time <l> | M |\n|-\n| Gen: |  |\n| 04:00-05:30 | A |")
+          (org-mode)
+          (goto-char (point-min))
+          (search-forward "|")
+          (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "prompted")))
+            (let* ((dest (writing-schedule-save-template))
+                   (body (with-temp-buffer (insert-file-contents dest) (buffer-string))))
+              (should (string-suffix-p "prompted.org" dest))
+              (should (string-suffix-p "\n" body)))))
+      (delete-directory dir t))))
+
 (provide 'test-writing-schedule-integration)
 ;;; test-writing-schedule-integration.el ends here
