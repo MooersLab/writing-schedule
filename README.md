@@ -4,7 +4,7 @@ Turn a weekly writing-block table into org agenda events and an iCalendar
 file you can import into Outlook Web or any calendar application.
 
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
-![Tests](https://img.shields.io/badge/tests-63%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-66%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
@@ -169,7 +169,10 @@ jump straight to the latest week, run `M-x writing-schedule-open-recent`.
 Keep a library of filled tables in `writing-schedule-template-directory`,
 one per context, for example `teaching-week.org`, `grant-deadline.org`,
 or `writing-retreat.org`. Each already has the letters assigned, so the
-weekly half hour of deciding where each project goes is done once.
+weekly half hour of deciding where each project goes is done once. If your
+tables live in `~/org/writing-schedule/table`, point the library there with
+`(setq writing-schedule-template-directory "~/org/writing-schedule/table/")`,
+or use the default `templates/` subdirectory.
 
 ```
 M-x writing-schedule-new-week-from-template
@@ -180,6 +183,17 @@ Choose a template. The command copies it to this week's working table in
 the table so you can adjust a few letters and run
 `writing-schedule-generate` right away. Because the copy is separate from
 the template, your library stays intact.
+
+If a saved table already matches the coming week and you do not need to
+edit it, generate from it in one step:
+
+```
+M-x writing-schedule-generate-from-template
+```
+
+This lists your saved tables, and after you pick one it generates the
+dated schedule of events for the org agenda directly, prompting for the
+project mapping and the week. It reads the table without changing it.
 
 ### Feeding the agenda
 
@@ -204,13 +218,14 @@ so all three become sources of TODO items and timed blocks.
 | `writing-schedule-open-week`       | Open an archived week by completion, newest first, or by date with a prefix argument |
 | `writing-schedule-open-recent`     | Open the most recent archived week               |
 | `writing-schedule-new-week-from-template` | Copy a saved template into this week and open it, ready to generate |
+| `writing-schedule-generate-from-template` | Select a saved table and generate the schedule from it directly |
 
 ## Key bindings
 
 The package ships a prefix keymap, `writing-schedule-command-map`, that
 puts the commands on single keys: `g` generate, `t` template, `n` new
-week from template, `o` open week, `r` open recent, `e` export ics, and
-`a` add to agenda. Bind it
+week from template, `f` generate from a saved table, `o` open week, `r`
+open recent, `e` export ics, and `a` add to agenda. Bind it
 under any prefix you like. When `C-c w` is already your writing prefix,
 nest it on a free key such as `c`.
 
@@ -233,6 +248,7 @@ adds which-key labels.
       "C-c w c g" "generate week"
       "C-c w c t" "insert template"
       "C-c w c n" "new week from template"
+      "C-c w c f" "generate from table"
       "C-c w c o" "open week"
       "C-c w c r" "open recent"
       "C-c w c e" "export ics"
@@ -404,7 +420,7 @@ make coverage EMACS_DIR=~/e30fewpackages
 ```
 
 For an HTML report, run `make coverage-html` and open `htmlcov/index.html`.
-The current suite reports 100 percent line coverage across 62 tests. The
+The current suite reports 100 percent line coverage across 66 tests. The
 `make coverage-check` target fails the build if coverage falls below 90
 percent, which suits a continuous-integration gate.
 
