@@ -2,7 +2,12 @@
 
 Turn a weekly writing-block table into org agenda events and an iCalendar
 file you can import into Outlook Web or any calendar application. Run from
-inside Emacs, or for non-Emacs users, from the shell with a bash script.
+inside Emacs for use with org-agenda, or for non-Emacs users, from the
+shell with a bash script for use with iCal or Outlook Calendar. Originally
+designed to schedule writing, but it can be used for any recurring
+activity, like writing code, working on email, yard work, exercising,
+buying groceries, and so on. Rare events are best added manually to the
+calendar.
 
 ![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.1.0&color=blue)
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
