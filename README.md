@@ -1,18 +1,25 @@
 # writing-schedule.el
 
 Turn a weekly writing-block table into org agenda events and an iCalendar
-file you can import into Outlook Web or any calendar application. 
-Run from inside Emacs for use with org-agenda, or for non-Emacs users, from the shell with a bash script for use with iCal or Outlook Calendar. Originally designed to schedule writing but can be used for any recurring activity, like writing code, working on email, yard work, exercising, buying groceries, and so on. Rare events are best added manually.
+file you can import into Outlook Web or any calendar application. Run from
+inside Emacs for use with org-agenda, or for non-Emacs users, from the
+shell with a bash script for use with iCal or Outlook Calendar. Originally
+designed to schedule writing, but it can be used for any recurring
+activity, like writing code, working on email, yard work, exercising,
+buying groceries, and so on. Rare events are best added manually to the
+calendar.
 
 ![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.1.0&color=blue)
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
-![Tests](https://img.shields.io/badge/tests-80%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-83%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 You keep a weekly plan as an org table. Each row is a time block, each
-column after the first is a day, and each filled cell holds a letter (A,
-B, C, or D) that names the project worked on during that block. This
+column after the first is a day, and each filled cell holds a short
+uppercase code that names the project or task worked on during that
+block, for example A, B, or a two-letter task code such as EM for email.
+A table can hold many codes, so it is not limited to four projects. This
 package reads that table and writes a schedule file of dated events.
 Those events feed the org agenda, and org's own iCalendar exporter turns
 them into a file that Outlook Web or any calendar application can import.
@@ -30,7 +37,7 @@ blocks.*
 
 ## Features
 
-- Insert a blank template for one to four projects.
+- Insert a blank template for up to 26 projects, or use your own short uppercase codes.
 - Parse a filled table into dated, timed org events.
 - Prompt for a project code and description per letter, with legend rows
   supplying the defaults.
@@ -66,6 +73,7 @@ writing-schedule.el                        The package.
 writing-schedule.sh                        Command-line front end for non-Emacs users.
 writing-schedule-3-example.org             A filled three-project table.
 examples/three-projects.org                An example template to copy into your templates dir.
+examples/projects-and-tasks.org            An example mixing projects and two-letter task codes.
 writing-schedule/                          Archive directory of dated weekly files.
   templates/                               Saved context templates (filled tables).
   tables/                                  This week's working table, copied from a template.
@@ -116,7 +124,7 @@ project.
 
 ### 2. Fill the table
 
-Type a letter into each day cell to assign a project to that block.
+Type a code into each day cell to assign a project or task to that block.
 Leave a cell empty to skip that block on that day. The table looks like
 this once filled.
 
@@ -132,11 +140,19 @@ this once filled.
 ```
 
 Put a short project description in the first column of each legend row,
-after the letter and colon, for example a first cell of `A: docking`.
-That description becomes the event title. The parser tolerates irregular
+after the code and colon, for example a first cell of `A: docking`. That
+description becomes the event title. The parser tolerates irregular
 spacing and single-digit hours, so `9:15 - 10:45`, `04:00-5:30`, and even
-`15:00-16: 30` all work, and a lower-case cell letter is normalized to
+`15:00-16: 30` all work, and a lower-case cell code is normalized to
 upper case.
+
+A code is not limited to a single letter, and a table is not limited to
+four projects. Any short uppercase code works, so you can mix projects
+with recurring tasks, for example `EM` for email, `EX` for exercise, or
+`W` for your daily words. Uppercase is what marks a code, because a
+capitalized word such as `Generative` is read as a section header rather
+than a code. See `examples/projects-and-tasks.org` for a week that mixes
+projects and two-letter task codes.
 
 ### 3. Generate the schedule
 
@@ -239,7 +255,7 @@ so all three become sources of TODO items and timed blocks.
 
 | Command                            | Purpose                                          |
 |------------------------------------|--------------------------------------------------|
-| `writing-schedule-insert-template` | Insert a blank table for one to four projects    |
+| `writing-schedule-insert-template` | Insert a blank table for up to 26 projects        |
 | `writing-schedule-generate`        | Parse the table at point and write the org file  |
 | `writing-schedule-export-ics`      | Export the org file to an `.ics` file            |
 | `writing-schedule-add-to-agenda`   | Add the generated file to `org-agenda-files`     |
@@ -467,7 +483,7 @@ make coverage EMACS_DIR=~/e30fewpackages
 ```
 
 For an HTML report, run `make coverage-html` and open `htmlcov/index.html`.
-The current suite reports 100 percent line coverage across 80 tests. The
+The current suite reports 100 percent line coverage across 83 tests. The
 `make coverage-check` target fails the build if coverage falls below 90
 percent, which suits a continuous-integration gate.
 
