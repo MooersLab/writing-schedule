@@ -307,17 +307,30 @@ writes an iCalendar file for import into Apple Calendar or Outlook.
 ./writing-schedule.sh deps
 @end example
 
-The @code{list} command prints the available templates. The
-@code{generate} command writes a dated schedule and an @file{.ics} file
-for the week that contains the given date. Paths are configured through
-the environment variables @env{WS_DIR}, @env{WS_TEMPLATE_DIR},
-@env{WS_OUT_DIR}, and @env{WS_TIMEZONE}. The script drives the two batch
-functions below, which can also be called directly through
-@command{emacs --batch}.
+The script mirrors the package's capabilities. The commands are
+@code{list} (print the templates), @code{weeks} (print the archived
+weeks, newest first), @code{template} (print or write a blank template),
+@code{generate} (write a dated schedule and an @file{.ics} file for the
+week that contains the given date), @code{export} (export an existing
+schedule to @file{.ics}), and @code{save} (save a table file into the
+template library). Paths are configured through the environment variables
+@env{WS_DIR}, @env{WS_OUT_DIR}, @env{WS_TEMPLATE_DIR}, @env{WS_TABLE_DIR},
+and @env{WS_TIMEZONE}. The script drives the batch functions below, which
+can also be called directly through @command{emacs --batch}.
 
 @deffn Command writing-schedule-batch-list-templates &optional directory
 Print the available templates to standard output, one per line.
 @var{directory} defaults to @code{writing-schedule-template-directory}.
+@end deffn
+
+@deffn Command writing-schedule-batch-list-weeks &optional directory
+Print the archived weekly files to standard output, newest first.
+@var{directory} overrides @code{writing-schedule-directory}.
+@end deffn
+
+@deffn Command writing-schedule-batch-insert-template n &optional file
+Write or print a blank template for @var{n} projects. With @var{file},
+write it there, otherwise print it to standard output.
 @end deffn
 
 @deffn Command writing-schedule-batch-generate table week &optional out-dir
@@ -327,6 +340,11 @@ table's legend rows, so no prompts are needed. @var{out-dir} overrides
 @code{writing-schedule-directory}. For readable event titles, fill the
 legend rows of the template, because those descriptions become the event
 titles.
+@end deffn
+
+@deffn Command writing-schedule-batch-save-template table-file name
+Save the table in @var{table-file} into the template library under
+@var{name}, wrapping it with the file's title or @var{name}.
 @end deffn
 
 @node Testing
