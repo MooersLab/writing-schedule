@@ -20,6 +20,12 @@ project fills which block. The generator is the usher that walks the
 chart, stamps each seat with a real date and time, and hands the guest
 list to your calendar.
 
+![From an edited table to timed blocks in org-agenda](imgs/writing-schedule-flow.png)
+
+*The pipeline: an edited table becomes a dated schedule file of
+timestamped headlines, which org-agenda shows as the week's timed
+blocks.*
+
 ## Features
 
 - Insert a blank template for one to four projects.
@@ -67,6 +73,7 @@ test/
   test-writing-schedule-integration.el     Integration tests.
 doc/
   writing-schedule.texi                    Texinfo manual.
+diagrams/                                  Figures used in this README.
 README.md                                  This file.
 ```
 
@@ -145,6 +152,12 @@ that week's Monday. The command writes a dated file for that week, such as
 adds the file to your agenda and offers to export the iCalendar file.
 Each following week lands in its own file, so past weeks are archived
 rather than overwritten.
+
+![The prompts writing-schedule-generate asks, with sample responses](imgs/writing-schedule-prompts.png)
+
+*The prompt sequence, with sample responses. The description default
+comes from the legend row, and the agenda step is automatic, because it
+is controlled by `writing-schedule-add-to-agenda` rather than a prompt.*
 
 ### 4. Sync a calendar
 
