@@ -15,8 +15,10 @@
 ;;
 ;; This package reads a weekly writing schedule that you keep as an
 ;; org-mode table.  Each row is a time block.  Each column after the
-;; first is a day of the week.  Each filled cell holds a letter (A, B,
-;; C, or D) that names the project worked on during that block.
+;; first is a day of the week.  Each filled cell holds a short uppercase
+;; code that names the project or task worked on during that block, for
+;; example A, B, or a two-letter task code such as EM for email.  A table
+;; can hold many codes, so it is not limited to four projects.
 ;;
 ;; The package turns that table into dated events.  Each week is
 ;; archived in its own dated file, such as writing-2026-01-19.org,
@@ -30,7 +32,7 @@
 ;; and time, and hands the guest list to your calendar.
 ;;
 ;; Main commands:
-;;   `writing-schedule-insert-template'         insert a blank table for 1 to 4 projects
+;;   `writing-schedule-insert-template'         insert a blank table for 1 to 26 projects
 ;;   `writing-schedule-new-week-from-template'  start this week from a saved template
 ;;   `writing-schedule-generate'                parse the table at point and write the org file
 ;;   `writing-schedule-open-week'               open an archived week, by completion or by date
@@ -192,8 +194,13 @@ and :letter."
                     (push (cons i off) columns)))
                 (setq i (1+ i))))
             (setq columns (nreverse columns)))
-           ;; Legend row.  A single letter, then a colon.
-           ((string-match "\\`\\([A-Da-d]\\)[ \t]*:\\(.*\\)\\'" label)
+           ;; Legend row.  A short uppercase code (one letter, then up to
+           ;; three more letters or digits), then a colon.  The match is
+           ;; case-sensitive, so an uppercase code such as A, EM, or W2 is
+           ;; a legend row, while a capitalized section header such as
+           ;; Generative is not.
+           ((let ((case-fold-search nil))
+              (string-match "\\`\\([A-Z][A-Z0-9]\\{0,3\\}\\)[ \t]*:\\(.*\\)\\'" label))
             (let ((ltr (upcase (match-string 1 label)))
                   (desc (string-trim (match-string 2 label))))
               (when (string-empty-p desc)
@@ -467,12 +474,21 @@ the week to schedule."
           (mapconcat (lambda (_) "  |") (make-list nd t) "")
           "\n"))
 
+(defconst writing-schedule--project-letters
+  '("A" "B" "C" "D" "E" "F" "G" "H" "I" "J" "K" "L" "M"
+    "N" "O" "P" "Q" "R" "S" "T" "U" "V" "W" "X" "Y" "Z")
+  "Default single-letter project codes for a scaffolded template.")
+
 (defun writing-schedule--template-string (n)
-  "Return a blank weekly schedule template for N projects (1 to 4)."
-  (setq n (max 1 (min 4 (if (stringp n) (string-to-number n) n))))
+  "Return a blank weekly schedule template for N projects (1 to 26).
+The scaffold uses single-letter codes.  For task codes of your own, such
+as EM or EX, edit the legend rows and the day cells to use them, because
+any short uppercase code is accepted."
+  (setq n (max 1 (min (length writing-schedule--project-letters)
+                      (if (stringp n) (string-to-number n) n))))
   (let* ((days '("M" "Tu" "W" "Th" "F" "Sa"))
          (nd (length days))
-         (letters (seq-take '("A" "B" "C" "D") n)))
+         (letters (seq-take writing-schedule--project-letters n)))
     (concat
      (format "#+TITLE: Writing Schedule for %d Project%s\n\n" n (if (= n 1) "" "s"))
      "| Time <l> | " (mapconcat #'identity days " | ") " |\n"
@@ -514,8 +530,10 @@ Return DEST."
 
 ;;;###autoload
 (defun writing-schedule-insert-template (n)
-  "Insert a blank weekly schedule table for N projects (1 to 4)."
-  (interactive "nNumber of writing projects (1-4): ")
+  "Insert a blank weekly schedule table for N projects (1 to 26).
+The scaffold uses single-letter codes.  You can rename the legend rows
+and use your own short uppercase codes, such as EM or EX, in the cells."
+  (interactive "nNumber of writing projects (1-26): ")
   (let ((start (point)))
     (insert (writing-schedule--template-string n))
     (goto-char start)
