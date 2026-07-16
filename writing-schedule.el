@@ -603,6 +603,39 @@ teaching week, a meeting week, or a writing retreat."
                  (file-name-nondirectory dest)))
       buffer)))
 
+;;;###autoload
+(defun writing-schedule-generate-from-template ()
+  "Select a saved table and generate a week's schedule from it.
+Choose one of the tables in the template directory, meaning your library
+of recurring-week tables, then generate the dated schedule of events for
+the org agenda.  The table is loaded into a buffer and
+`writing-schedule-generate' runs on it, so you are prompted for the
+project mapping and the week as usual.  The saved table is not modified,
+because the schedule is written to a separate dated file.
+
+Use this when a saved table already matches the coming week.  Use
+`writing-schedule-new-week-from-template' instead when you want to copy a
+table and adjust a few letters before generating."
+  (interactive)
+  (let* ((tdir (writing-schedule--template-directory))
+         (tables (and (file-directory-p tdir)
+                      (directory-files tdir nil "\\.org\\'" t))))
+    (unless tables
+      (user-error "No tables found in %s.  Add filled tables there first" tdir))
+    (let* ((choice (completing-read "Generate from table: "
+                                    (sort tables #'string<) nil t))
+           (source (expand-file-name choice tdir))
+           (buffer (get-buffer-create (format "*writing-schedule: %s*" choice))))
+      (with-current-buffer buffer
+        (erase-buffer)
+        (insert-file-contents source)
+        (org-mode)
+        (goto-char (point-min))
+        (unless (re-search-forward "^[ \t]*|" nil t)
+          (user-error "No org table found in %s" choice))
+        (forward-line 0)
+        (writing-schedule-generate)))))
+
 ;;;; Batch use from the command line
 
 (defun writing-schedule--legend-mapping (letters legend)
@@ -678,6 +711,7 @@ Meant to be called from a shell through emacs --batch."
     (define-key map "g" #'writing-schedule-generate)
     (define-key map "t" #'writing-schedule-insert-template)
     (define-key map "n" #'writing-schedule-new-week-from-template)
+    (define-key map "f" #'writing-schedule-generate-from-template)
     (define-key map "o" #'writing-schedule-open-week)
     (define-key map "r" #'writing-schedule-open-recent)
     (define-key map "e" #'writing-schedule-export-ics)
@@ -690,7 +724,8 @@ writing prefix, the following places the commands under C-c w c:
   (keymap-set my-writing-prefix \"c\" writing-schedule-command-map)
 
 The keys are g generate, t template, n new week from template,
-o open week, r open recent, e export ics, and a add to agenda.")
+f generate from a saved table, o open week, r open recent, e export ics,
+and a add to agenda.")
 
 (provide 'writing-schedule)
 ;;; writing-schedule.el ends here
