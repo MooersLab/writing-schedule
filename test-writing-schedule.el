@@ -62,6 +62,11 @@
   (should-not (writing-schedule--parse-time ""))
   (should-not (writing-schedule--parse-time nil)))
 
+(ert-deftest writing-schedule/parse-time/tolerates-space-after-colon ()
+  "A space after the colon in a time is tolerated, as in 16: 30."
+  (should (equal (writing-schedule--parse-time "15:00-16: 30") '("15:00" . "16:30")))
+  (should (equal (writing-schedule--parse-time "9: 15 - 10:45") '("09:15" . "10:45"))))
+
 ;;;; writing-schedule--minutes
 
 (ert-deftest writing-schedule/minutes/various-durations ()
@@ -122,6 +127,55 @@
                   ("04:00-05:30" "a")))
          (event (car (plist-get (writing-schedule--parse table) :events))))
     (should (equal (plist-get event :letter) "A"))))
+
+(ert-deftest writing-schedule/parse/legend-description-in-first-column ()
+  "A legend row carries the description in its first cell after the colon."
+  (let* ((table '(("Time <l>" "M")
+                  hline
+                  ("Gen:" "")
+                  ("04:00-05:30" "A")
+                  hline
+                  ("A:0211dnph1docking" "")
+                  ("B: DUSP1 radiation" "")))
+         (legend (plist-get (writing-schedule--parse table) :legend)))
+    (should (equal (cdr (assoc "A" legend)) "0211dnph1docking"))
+    (should (equal (cdr (assoc "B" legend)) "DUSP1 radiation"))))
+
+(ert-deftest writing-schedule/parse/two-letter-codes-and-many-projects ()
+  "Two-letter task codes attach legend descriptions, beyond four projects."
+  (let* ((table '(("Time <l>" "M" "Tu" "W")
+                  hline
+                  ("Generative:" "" "" "")
+                  ("04:00-05:30" "A" "EM" "W")
+                  ("05:45-07:15" "B" "EX" "TT")
+                  hline
+                  ("A: DNPH1 docking" "" "" "")
+                  ("B: DUSP1 radiation" "" "" "")
+                  ("EM: email" "" "" "")
+                  ("EX: exercise" "" "" "")
+                  ("W: 2026words" "" "" "")
+                  ("TT: time tracking" "" "" "")))
+         (parsed (writing-schedule--parse table))
+         (legend (plist-get parsed :legend))
+         (letters (plist-get parsed :letters)))
+    (should (equal letters '("A" "B" "EM" "EX" "TT" "W")))
+    (should (equal (cdr (assoc "EM" legend)) "email"))
+    (should (equal (cdr (assoc "W" legend)) "2026words"))
+    (should (equal (cdr (assoc "TT" legend)) "time tracking"))
+    (should-not (assoc "GENERATIVE" legend))))
+
+(ert-deftest writing-schedule/parse/legend-code-is-case-sensitive ()
+  "An uppercase code is a legend row; a capitalized word is a section."
+  (let* ((table '(("Time <l>" "M")
+                  hline
+                  ("Gen:" "")
+                  ("04:00-05:30" "EM")
+                  hline
+                  ("EM: email" "")))
+         (parsed (writing-schedule--parse table)))
+    (should (equal (cdr (assoc "EM" (plist-get parsed :legend))) "email"))
+    (should-not (assoc "GEN" (plist-get parsed :legend)))
+    (should (equal (plist-get (car (plist-get parsed :events)) :section) "Gen"))))
 
 (ert-deftest writing-schedule/parse/section-without-colon ()
   "A section header written without a trailing colon is still recognized."
@@ -326,6 +380,25 @@ and are used verbatim when set, at call time and in any load order."
     (should (string= (writing-schedule--template-directory) "/custom/tpl"))
     (should (string= (writing-schedule--table-directory) "/custom/tab"))))
 
+(ert-deftest writing-schedule/template-string/builds-n-projects ()
+  "The template has a title, a day header, and one legend row per project."
+  (let ((s (writing-schedule--template-string 3)))
+    (should (string-match-p "#\\+TITLE: Writing Schedule for 3 Projects" s))
+    (should (string-match-p "Time <l>" s))
+    (should (string-match-p "| A: |" s))
+    (should (string-match-p "| C: |" s))
+    (should-not (string-match-p "| D: |" s)))
+  (should (string-match-p "for 1 Project\n" (writing-schedule--template-string 0)))
+  (should (string-match-p "for 9 Projects" (writing-schedule--template-string "9")))
+  (should (string-match-p "for 26 Projects" (writing-schedule--template-string 99))))
+
+(ert-deftest writing-schedule/template-string/more-than-four ()
+  "The scaffold can produce more than four single-letter projects."
+  (let ((s (writing-schedule--template-string 6)))
+    (should (string-match-p "| E: |" s))
+    (should (string-match-p "| F: |" s))
+    (should-not (string-match-p "| G: |" s))))
+
 ;;;; writing-schedule--legend-mapping
 
 (ert-deftest writing-schedule/legend-mapping/uses-legend-descriptions ()
@@ -345,6 +418,8 @@ and are used verbatim when set, at call time and in any load order."
   (dolist (pair '(("g" . writing-schedule-generate)
                   ("t" . writing-schedule-insert-template)
                   ("n" . writing-schedule-new-week-from-template)
+                  ("f" . writing-schedule-generate-from-template)
+                  ("s" . writing-schedule-save-template-table)
                   ("o" . writing-schedule-open-week)
                   ("r" . writing-schedule-open-recent)
                   ("e" . writing-schedule-export-ics)
