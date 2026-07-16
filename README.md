@@ -15,6 +15,9 @@ calendar.
 ![Tests](https://img.shields.io/badge/tests-83%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
+![Google Calendar](https://img.shields.io/badge/Google_Calendar-import-4285F4?logo=googlecalendar&logoColor=white)
+![Apple Calendar](https://img.shields.io/badge/Apple_Calendar-import-000000?logo=apple&logoColor=white)
+![Outlook](https://img.shields.io/badge/Outlook-import-0078D4?logo=microsoftoutlook&logoColor=white)
 
 You keep a weekly plan as an org table. Each row is a time block, each
 column after the first is a day, and each filled cell holds a short
