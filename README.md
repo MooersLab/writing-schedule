@@ -154,7 +154,7 @@ adds the file to your agenda and offers to export the iCalendar file.
 Each following week lands in its own file, so past weeks are archived
 rather than overwritten.
 
-![The prompts writing-schedule-generate asks, with sample responses](diagrams/writing-schedule-prompts.png)
+![The prompts writing-schedule-generate asks, with sample responses](imgs/writing-schedule-prompts.png)
 
 *The prompt sequence, with sample responses. The description default
 comes from the legend row, and the agenda step is automatic, because it
