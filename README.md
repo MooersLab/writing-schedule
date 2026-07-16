@@ -202,7 +202,7 @@ To keep a table you have customized for a particular kind of week, put
 point in the table and run:
 
 ```
-M-x writing-schedule-save-template
+M-x writing-schedule-save-template-table
 ```
 
 It prompts for a name and writes the table to your template directory, so
@@ -232,7 +232,7 @@ so all three become sources of TODO items and timed blocks.
 | `writing-schedule-open-recent`     | Open the most recent archived week               |
 | `writing-schedule-new-week-from-template` | Copy a saved template into this week and open it, ready to generate |
 | `writing-schedule-generate-from-template` | Select a saved table and generate the schedule from it directly |
-| `writing-schedule-save-template`          | Save the edited table at point as a named template |
+| `writing-schedule-save-template-table`          | Save the edited table at point as a named template |
 
 ## Key bindings
 

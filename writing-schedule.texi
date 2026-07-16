@@ -189,7 +189,7 @@ week, and use @code{writing-schedule-new-week-from-template} when you
 want to copy a table and edit a few letters first.
 @end deffn
 
-@deffn Command writing-schedule-save-template &optional name
+@deffn Command writing-schedule-save-template-table &optional name
 Save the org table at point as a template named NAME in the template
 directory, so a table you have customized for a particular kind of week
 joins the library. An existing @code{#+TITLE:} line is preserved,

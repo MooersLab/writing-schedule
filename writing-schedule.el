@@ -638,7 +638,7 @@ table and adjust a few letters before generating."
         (writing-schedule-generate)))))
 
 ;;;###autoload
-(defun writing-schedule-save-template (&optional name)
+(defun writing-schedule-save-template-table (&optional name)
   "Save the org table at point as a template named NAME.
 Write it to the template directory, so you can later choose it with
 `writing-schedule-generate-from-template' or
@@ -750,7 +750,7 @@ Meant to be called from a shell through emacs --batch."
     (define-key map "t" #'writing-schedule-insert-template)
     (define-key map "n" #'writing-schedule-new-week-from-template)
     (define-key map "f" #'writing-schedule-generate-from-template)
-    (define-key map "s" #'writing-schedule-save-template)
+    (define-key map "s" #'writing-schedule-save-template-table)
     (define-key map "o" #'writing-schedule-open-week)
     (define-key map "r" #'writing-schedule-open-recent)
     (define-key map "e" #'writing-schedule-export-ics)
