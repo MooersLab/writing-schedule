@@ -21,7 +21,7 @@ project fills which block. The generator is the usher that walks the
 chart, stamps each seat with a real date and time, and hands the guest
 list to your calendar.
 
-![From an edited table to timed blocks in org-agenda](diagrams/writing-schedule-flow.png)
+![From an edited table to timed blocks in org-agenda](imgs/writing-schedule-flow.png)
 
 *The pipeline: an edited table becomes a dated schedule file of
 timestamped headlines, which org-agenda shows as the week's timed
@@ -74,7 +74,7 @@ test/
   test-writing-schedule-integration.el     Integration tests.
 doc/
   writing-schedule.texi                    Texinfo manual.
-diagrams/                                  Figures used in this README.
+imgs/                                      Figures used in this README.
 README.md                                  This file.
 ```
 
@@ -131,11 +131,11 @@ this once filled.
 ```
 
 Put a short project description in the first column of each legend row,
-after the letter and colon, for example a first cell of `A: docking`.
+after the letter and colon, for example, a first cell of `A: docking`.
 That description becomes the event title. The parser tolerates irregular
 spacing and single-digit hours, so `9:15 - 10:45`, `04:00-5:30`, and even
 `15:00-16: 30` all work, and a lower-case cell letter is normalized to
-upper case.
+uppercase.
 
 ### 3. Generate the schedule
 
@@ -145,7 +145,7 @@ Put point anywhere inside the table and run:
 M-x writing-schedule-generate
 ```
 
-For each letter you are asked for a project code and a description. If
+For each letter, you are asked for a project code and a description. If
 you typed a description into a legend row, it becomes the default. Then
 you pick any day inside the target week, and the command snaps back to
 that week's Monday. The command writes a dated file for that week, such as
@@ -366,7 +366,7 @@ WS_TABLE_DIR      working-table directory (default: WS_OUT_DIR/tables)
 WS_TIMEZONE       iCalendar timezone, for example America/Chicago (default: local)
 ```
 
-Set `WS_OUT_DIR` alone and the templates and tables directories follow it.
+Set `WS_OUT_DIR` alone, and the templates and tables directories follow it.
 Override `WS_TEMPLATE_DIR` or `WS_TABLE_DIR` only to place them elsewhere.
 
 Check dependencies. The script needs only Emacs, because org and ox-icalendar
