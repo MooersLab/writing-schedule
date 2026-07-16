@@ -103,11 +103,18 @@ required to generate schedules or export calendars.
 
 A schedule table has one label column and one column per day. The first
 row names the days. Section header rows group the blocks. Time-block
-rows carry a time range in the label column and a project letter in each
-day cell that is in use. Legend rows at the bottom associate each letter
-with a description, which goes in the first column after the letter and
-the colon, such as @samp{A: docking}. That description becomes the event
-title.
+rows carry a time range in the label column and a short uppercase code in
+each day cell that is in use. Legend rows at the bottom associate each
+code with a description, which goes in the first column after the code
+and the colon, such as @samp{A: docking}. That description becomes the
+event title.
+
+A code is not limited to a single letter, and a table is not limited to
+four projects. Any short uppercase code works, so you can mix projects
+with recurring tasks, for example @samp{EM} for email or @samp{W} for
+your daily words. Uppercase is what marks a code, because a capitalized
+word such as @samp{Generative} is read as a section header. See
+@file{examples/projects-and-tasks.org} for a mixed example.
 
 @example
 | Time <l>    | M | Tu | W | Th | F | Sa |
@@ -131,7 +138,9 @@ is scheduled for that day and time.
 
 @deffn Command writing-schedule-insert-template n
 Insert a blank weekly table for @var{n} projects, where @var{n} is
-clamped to the range one to four. The default time blocks come from
+clamped to the range one to twenty-six. The scaffold uses single-letter
+codes, and you can rename the legend rows to your own short uppercase
+codes, such as @samp{EM} or @samp{EX}. The default time blocks come from
 @code{writing-schedule-default-slots}.
 @end deffn
 
