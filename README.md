@@ -3,7 +3,8 @@
 Turn a weekly writing-block table into org agenda events and an iCalendar
 file you can import into Outlook Web or any calendar application. Run from
 inside Emacs for use with org-agenda, or for non-Emacs users, from the
-shell with a bash script for use with iCal or Outlook Calendar. Originally
+shell with a bash script for use with iCal, Google Calendar, or Outlook
+Calendar. Originally
 designed to schedule writing, but it can be used for any recurring
 activity, like writing code, working on email, yard work, exercising,
 buying groceries, and so on. Rare events are best added manually to the
@@ -179,10 +180,33 @@ is controlled by `writing-schedule-add-to-agenda` rather than a prompt.*
 
 ### 4. Sync a calendar
 
-Run `M-x writing-schedule-export-ics` to write the `.ics` file. In
-Outlook Web, choose **Add calendar** then **Upload from file**. Because
-each headline carries a stable identifier, importing an edited week
-updates the matching events rather than duplicating them.
+Run `M-x writing-schedule-export-ics`, or from the shell
+`writing-schedule.sh export`, to write the `.ics` file, then import it
+into any calendar application. Because each headline carries a stable
+identifier, importing an edited week updates the matching events rather
+than duplicating them. The steps for the three common calendars follow.
+
+**Apple Calendar (macOS or iOS).** Choose **File > Import...**, select the
+`.ics` file, then pick a calendar.
+
+**Outlook on the web.** Choose **Add calendar** then **Upload from file**,
+and select the `.ics` file.
+
+**Google Calendar.**
+
+1. Open Google Calendar in your web browser.
+2. In the top right corner, click the Settings menu (the gear icon) and select **Settings**.
+3. In the left-hand sidebar, click **Import & export**.
+4. Click on **Select file from your computer** and select the `.ics` file you want to upload.
+5. Choose which calendar you want to add the imported events to using the **Add to calendar** dropdown menu.
+6. Click **Import**.
+
+Note: If you want to keep these events separate from your main schedule,
+it is highly recommended to create a new secondary calendar (for example,
+named "Writing") first, and then select that calendar during the import
+step. This makes it easy to toggle the schedule on and off or delete the
+events in bulk if you need to re-generate the week. Apple Calendar, Google
+Calendar, and Outlook all support secondary calendars.
 
 ### 5. Browse the archive
 
@@ -343,12 +367,12 @@ give straight a git recipe (adjust the host and repo to yours).
 You do not need to know Emacs to get a calendar from a template. The
 `writing-schedule.sh` script uses Emacs only as an engine, and it mirrors
 the package's capabilities, producing an iCalendar (`.ics`) file that you can
-import into Apple Calendar or Outlook Calendar.
+import into Apple Calendar, Google Calendar, or Outlook Calendar.
 
 ![From an edited table to timed blocks in your calendar](imgs/writing-schedule-flow-sh.png)
 
 *The shell path: an edited table becomes an iCalendar file, which you
-import into Apple Calendar or Outlook as the week's timed blocks. It
+import into Apple Calendar, Google Calendar, or Outlook as the week's timed blocks. It
 parallels the Emacs flow shown in the introduction.*
 
 The commands are:
@@ -374,10 +398,9 @@ generates the week:
 ./writing-schedule.sh generate teaching 2026-01-21
 ```
 
-The `generate` and `export` commands print the path of the `.ics` file. Import it:
-
-- Apple Calendar: File > Import..., choose the `.ics`, then pick a calendar.
-- Outlook (web): Add calendar > Upload from file, then choose the `.ics`.
+The `generate` and `export` commands print the path of the `.ics` file.
+To import it into Apple Calendar, Google Calendar, or Outlook, follow the
+steps under [Sync a calendar](#4-sync-a-calendar) above.
 
 Configure paths through the environment:
 
