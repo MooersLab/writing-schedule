@@ -176,6 +176,16 @@ and place point in the table so you can run
 the template, so the library stays intact.
 @end deffn
 
+@deffn Command writing-schedule-generate-from-template
+Select a saved table and generate a week's schedule from it directly.
+Choose one of the tables in @code{writing-schedule-template-directory},
+then generate the dated schedule of events for the org agenda, with the
+usual prompts for the project mapping and the week. The saved table is
+read but not modified. Use this when a table already matches the coming
+week, and use @code{writing-schedule-new-week-from-template} when you
+want to copy a table and edit a few letters first.
+@end deffn
+
 @node Customization
 @chapter Customization
 
