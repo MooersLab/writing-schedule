@@ -276,6 +276,14 @@ The directory for generated sheets. When nil, derive a @file{sheets}
 subdirectory of @code{writing-schedule-directory}.
 @end defvr
 
+@defvr {User Option} writing-schedule-code-descriptions
+An alist that maps a project code to a description for the sheet key,
+such as @code{(("A" . "DNPH1 docking"))}. These descriptions fill the key
+and the org Task column for codes the table legend does not describe. A
+legend entry in the table takes precedence, because it is specific to
+that week. Set this to keep a standing dictionary of your project codes.
+@end defvr
+
 @defvr {User Option} writing-schedule-use-todo
 When non-nil, each generated event is a TODO headline, so the schedule
 file also serves as a source of TODO items. Set it to nil for cleaner

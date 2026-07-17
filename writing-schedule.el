@@ -869,6 +869,17 @@ When nil, derive a \"sheets\" subdirectory of `writing-schedule-directory'."
   :type '(choice (const :tag "Derive from writing-schedule-directory" nil)
                  directory))
 
+(defcustom writing-schedule-code-descriptions nil
+  "Alist that maps a project code to a description for the sheet key.
+Each element is a cons cell of a code string and a description string,
+for example (\"A\" . \"DNPH1 docking\").  These descriptions fill the key
+across the top of a sheet, and the Task column of the org export, for
+codes that the table legend does not already describe.  A description in
+the table legend takes precedence, because it is specific to that week.
+Set this to keep a standing dictionary of your project codes, so the key
+is labeled even when a table carries bare codes without legend rows."
+  :type '(alist :key-type string :value-type string))
+
 (defun writing-schedule--sheets-directory ()
   "Return the directory for generated time-block sheets."
   (if writing-schedule-sheets-directory
@@ -892,6 +903,14 @@ When nil, derive a \"sheets\" subdirectory of `writing-schedule-directory'."
 (defun writing-schedule--timeblock-colspec (n)
   "Return a tabular spec with a narrow time column and N plan columns."
   (concat "|m{1cm}" (mapconcat (lambda (_) ":m{4cm}") (make-list n t) "") "|"))
+
+(defun writing-schedule--effective-legend (legend)
+  "Merge `writing-schedule-code-descriptions' into LEGEND.
+Entries in LEGEND take precedence, because they are specific to the week,
+and the custom descriptions fill in any codes the legend omits."
+  (append legend
+          (seq-remove (lambda (pair) (assoc (car pair) legend))
+                      writing-schedule-code-descriptions)))
 
 (defun writing-schedule--timeblock-key (letters legend)
   "Return the code key line for LETTERS using LEGEND descriptions."
@@ -1016,8 +1035,9 @@ DAYS is a list of (DATE-STR . SPANS)."
 DAYS is a list of (DATE-STR . CELLS), one per day column in the table."
   (let* ((events (plist-get parsed :events))
          (columns (plist-get parsed :columns))
-         (key (writing-schedule--timeblock-key (plist-get parsed :letters)
-                                               (plist-get parsed :legend)))
+         (key (writing-schedule--timeblock-key
+               (plist-get parsed :letters)
+               (writing-schedule--effective-legend (plist-get parsed :legend))))
          (offsets (sort (delete-dups (mapcar #'cdr columns)) #'<))
          (days '()))
     (dolist (off offsets)
@@ -1037,7 +1057,7 @@ HTML or other formats."
   (let* ((events (plist-get parsed :events))
          (columns (plist-get parsed :columns))
          (letters (plist-get parsed :letters))
-         (legend (plist-get parsed :legend))
+         (legend (writing-schedule--effective-legend (plist-get parsed :legend)))
          (offsets (sort (delete-dups (mapcar #'cdr columns)) #'<)))
     (concat
      (format "#+TITLE: Time-Block Sheets, week of %s\n"

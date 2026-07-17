@@ -12,7 +12,7 @@ calendar.
 
 ![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.1.0&color=blue)
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
-![Tests](https://img.shields.io/badge/tests-96%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-97%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 ![Google Calendar](https://img.shields.io/badge/Google_Calendar-import-4285F4?logo=googlecalendar&logoColor=white)
@@ -44,6 +44,7 @@ blocks.*
 - Insert a blank template for up to 26 projects, or use your own short uppercase codes.
 - Print two-page time-block sheets for a week, with each planned block drawn as an outlined box and blank columns for revisions.
 - Export the week to an editable org file of event tables for HTML or LaTeX.
+- Keep a standing dictionary of project codes so the key is labeled even from bare tables.
 - Parse a filled table into dated, timed org events.
 - Prompt for a project code and description per letter, with legend rows
   supplying the defaults.
@@ -309,6 +310,23 @@ sheets are written to a `sheets/` subdirectory and compiled when
 compile. The hours, the number of columns, and the sheet directory are
 all customizable.
 
+You can also customize the code descriptions shown in the key. A table
+carries its own legend rows, and those always win because they are
+specific to that week. For codes a table does not describe, the key falls
+back to a standing dictionary you keep in your configuration:
+
+```elisp
+(setq writing-schedule-code-descriptions
+      '(("A"  . "DNPH1 docking")
+        ("B"  . "DUSP1 radiation")
+        ("EM" . "email")
+        ("EX" . "exercise")))
+```
+
+With that in place, a weekly table can use bare codes without legend
+rows, and the key on each sheet, along with the Task column of the org
+export, is still labeled from the dictionary.
+
 ### Feeding the agenda
 
 Add your task file, the schedule file, and any project logs to the agenda
@@ -556,7 +574,7 @@ make coverage EMACS_DIR=~/e30fewpackages
 ```
 
 For an HTML report, run `make coverage-html` and open `htmlcov/index.html`.
-The current suite reports 100 percent line coverage across 96 tests. The
+The current suite reports 100 percent line coverage across 97 tests. The
 `make coverage-check` target fails the build if coverage falls below 90
 percent, which suits a continuous-integration gate.
 

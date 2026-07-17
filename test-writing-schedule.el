@@ -399,6 +399,24 @@ and are used verbatim when set, at call time and in any load order."
     (should (string-match-p "| F: |" s))
     (should-not (string-match-p "| G: |" s))))
 
+(ert-deftest writing-schedule/timeblock/custom-code-descriptions ()
+  "Custom descriptions fill the key, and the table legend takes precedence."
+  (let ((writing-schedule-code-descriptions '(("Z" . "zebra") ("A" . "ignored"))))
+    (let ((eff (writing-schedule--effective-legend '(("A" . "docking")))))
+      (should (equal (cdr (assoc "A" eff)) "docking"))
+      (should (equal (cdr (assoc "Z" eff)) "zebra")))
+    (let* ((table '(("Time <l>" "M")
+                    hline
+                    ("04:00-05:30" "Z")))
+           (parsed (writing-schedule--parse table))
+           (monday (calendar-absolute-from-gregorian '(1 19 2026)))
+           (kd (writing-schedule--timeblock-days parsed monday)))
+      (should (string-match-p "Z = zebra" (car kd)))))
+  ;; With no custom descriptions the legend is unchanged.
+  (let ((writing-schedule-code-descriptions nil))
+    (should (equal (writing-schedule--effective-legend '(("A" . "docking")))
+                   '(("A" . "docking"))))))
+
 (ert-deftest writing-schedule/timeblock/colspec ()
   "The column spec has a narrow time column and N plan columns."
   (should (equal (writing-schedule--timeblock-colspec 4)
