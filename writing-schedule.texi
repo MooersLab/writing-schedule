@@ -198,6 +198,16 @@ week, and use @code{writing-schedule-new-week-from-template} when you
 want to copy a table and edit a few letters first.
 @end deffn
 
+@deffn Command writing-schedule-timeblock-sheets &optional per-day
+Generate printable time-block sheets from the table at point. Choose the
+week, then choose one PDF for the week or, with a prefix argument or
+non-nil PER-DAY, one PDF per day. Each day becomes a two-page sheet whose
+first column holds the planned blocks, whose top carries the code key,
+and whose other columns are blank. As the day changes you write a revised
+plan in the next column, which gives the schedule its flexibility and
+antifragility. Sheets compile to PDF when a LaTeX compiler is available.
+@end deffn
+
 @deffn Command writing-schedule-save-template-table &optional name
 Save the org table at point as a template named NAME in the template
 directory, so a table you have customized for a particular kind of week
@@ -235,6 +245,30 @@ this week's working table. The default is nil, which derives a
 @file{tables} subdirectory of @code{writing-schedule-directory}, keeping
 input tables out of the way of the dated schedules and the agenda. Set
 this only to place the working tables elsewhere.
+@end defvr
+
+@defvr {User Option} writing-schedule-timeblock-start-hour
+@defvrx {User Option} writing-schedule-timeblock-end-hour
+The first and last hours shown on a printable time-block sheet. The
+defaults are 4 and 23.
+@end defvr
+
+@defvr {User Option} writing-schedule-timeblock-columns
+The number of plan columns on a sheet, four by default. The first holds
+the plan; the rest are blank for revisions as the day changes.
+@end defvr
+
+@defvr {User Option} writing-schedule-timeblock-subrows
+The number of writing rows per hour, five by default.
+@end defvr
+
+@defvr {User Option} writing-schedule-latex-compiler
+The program used to compile a sheet to PDF, @command{pdflatex} by default.
+@end defvr
+
+@defvr {User Option} writing-schedule-sheets-directory
+The directory for generated sheets. When nil, derive a @file{sheets}
+subdirectory of @code{writing-schedule-directory}.
 @end defvr
 
 @defvr {User Option} writing-schedule-use-todo
@@ -354,6 +388,12 @@ titles.
 @deffn Command writing-schedule-batch-save-template table-file name
 Save the table in @var{table-file} into the template library under
 @var{name}, wrapping it with the file's title or @var{name}.
+@end deffn
+
+@deffn Command writing-schedule-batch-timeblock-sheets table week &optional per-day out-dir
+Write printable time-block sheets from @var{table} for @var{week}.
+Non-nil PER-DAY writes one file per day, else one for the week.
+@var{out-dir} overrides the sheets directory.
 @end deffn
 
 @node Testing
