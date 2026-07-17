@@ -33,11 +33,14 @@ project fills which block. The generator is the usher that walks the
 chart, stamps each seat with a real date and time, and hands the guest
 list to your calendar.
 
-![From an edited table to timed blocks in org-agenda](imgs/writing-schedule-flow.png)
+![Pipeline from writing-schedule.el or writing-schedule.sh to org-agenda, PDF or HTML, and calendars](imgs/writing-schedule-pipeline.png)
 
-*The pipeline: an edited table becomes a dated schedule file of
-timestamped headlines, which org-agenda shows as the week's timed
-blocks.*
+*The whole pipeline, left to right. You run a command from
+`writing-schedule.el` or `writing-schedule.sh` on your weekly block table.
+The generator writes a dated schedule file that feeds org-agenda, and,
+through org's iCalendar exporter, a `.ics` file that Google Calendar or
+Outlook Calendar can import. The sheet command writes a LaTeX time-block
+sheet that becomes a PDF, and an org file that exports to HTML.*
 
 ## Features
 
