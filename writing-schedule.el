@@ -1,14 +1,7 @@
 ;;; writing-schedule.el --- Generate agenda events and iCalendar from a weekly writing-block template -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2026 Blaine Mooers and the Regents of the University of Oklahoma
-
 ;; Author: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Version: 0.1.0
-
-;; This program is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation, version 3.
-
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: calendar, outlines, convenience
 
@@ -42,6 +35,7 @@
 ;;   `writing-schedule-insert-template'         insert a blank table for 1 to 26 projects
 ;;   `writing-schedule-new-week-from-template'  start this week from a saved template
 ;;   `writing-schedule-generate'                parse the table at point and write the org file
+;;   `writing-schedule-timeblock-sheets'        print time-block sheets for the week
 ;;   `writing-schedule-open-week'               open an archived week, by completion or by date
 ;;   `writing-schedule-open-recent'             open the most recent archived week
 ;;   `writing-schedule-export-ics'              export the org file to .ics
@@ -844,6 +838,257 @@ be called from a shell through emacs --batch."
         (princ (format "Saved template to %s\n" dest))
         dest))))
 
+;;;; Printable time-block sheets
+
+(defcustom writing-schedule-timeblock-start-hour 4
+  "First hour shown on a printable time-block sheet."
+  :type 'integer)
+
+(defcustom writing-schedule-timeblock-end-hour 23
+  "Last hour shown on a printable time-block sheet."
+  :type 'integer)
+
+(defcustom writing-schedule-timeblock-columns 4
+  "Number of plan columns on a printable time-block sheet.
+The first column holds the planned blocks.  The rest are left blank, so
+you can write a revised plan in the next column each time the day
+changes, which is what gives the sheet its flexibility."
+  :type 'integer)
+
+(defcustom writing-schedule-timeblock-subrows 5
+  "Number of writing rows per hour on a printable time-block sheet."
+  :type 'integer)
+
+(defcustom writing-schedule-latex-compiler "pdflatex"
+  "Program used to compile a time-block sheet to PDF."
+  :type 'string)
+
+(defcustom writing-schedule-sheets-directory nil
+  "Directory for generated time-block sheets.
+When nil, derive a \"sheets\" subdirectory of `writing-schedule-directory'."
+  :type '(choice (const :tag "Derive from writing-schedule-directory" nil)
+                 directory))
+
+(defun writing-schedule--sheets-directory ()
+  "Return the directory for generated time-block sheets."
+  (if writing-schedule-sheets-directory
+      (expand-file-name writing-schedule-sheets-directory)
+    (expand-file-name "sheets" writing-schedule-directory)))
+
+(defun writing-schedule--latex-escape (s)
+  "Escape LaTeX special characters in string S."
+  (let ((s (or s "")))
+    (dolist (pair '(("\\\\" . "\\\\textbackslash{}")
+                    ("&" . "\\\\&") ("%" . "\\\\%") ("\\$" . "\\\\$")
+                    ("#" . "\\\\#") ("_" . "\\\\_") ("{" . "\\\\{")
+                    ("}" . "\\\\}") ("~" . "\\\\textasciitilde{}")
+                    ("\\^" . "\\\\textasciicircum{}")) s)
+      (setq s (replace-regexp-in-string (car pair) (cdr pair) s t)))))
+
+(defun writing-schedule--hhmm-tidy (s)
+  "Drop a leading zero on the hour of an HH:MM string S."
+  (replace-regexp-in-string "\\`0" "" (or s "")))
+
+(defun writing-schedule--timeblock-colspec (n)
+  "Return a tabular spec with a narrow time column and N plan columns."
+  (concat "|m{1cm}" (mapconcat (lambda (_) ":m{4cm}") (make-list n t) "") "|"))
+
+(defun writing-schedule--timeblock-key (letters legend)
+  "Return the code key line for LETTERS using LEGEND descriptions."
+  (mapconcat
+   (lambda (ltr)
+     (let ((desc (cdr (assoc ltr legend))))
+       (if (and desc (not (string-empty-p desc)))
+           (format "%s = %s" ltr (writing-schedule--latex-escape desc))
+         ltr)))
+   letters ",\\quad "))
+
+(defun writing-schedule--timeblock-cells (events)
+  "Return an alist mapping (HOUR . SUBROW) to a plan label for EVENTS.
+SUBROW places the block within its hour according to the start minute."
+  (let ((sub writing-schedule-timeblock-subrows)
+        (cells '()))
+    (dolist (ev events)
+      (let* ((start (plist-get ev :start))
+             (parts (split-string start ":"))
+             (h (string-to-number (car parts)))
+             (m (string-to-number (cadr parts)))
+             (sr (min (1- sub) (/ (* m sub) 60)))
+             (label (format "%s\\quad %s-%s"
+                            (plist-get ev :letter)
+                            (writing-schedule--hhmm-tidy start)
+                            (writing-schedule--hhmm-tidy (plist-get ev :end)))))
+        (push (cons (cons h sr) label) cells)))
+    cells))
+
+(defun writing-schedule--timeblock-row (timecol data1 ncols)
+  "Return a table row of TIMECOL, DATA1, and blank cells filling NCOLS columns."
+  (concat (mapconcat #'identity
+                     (cons timecol (cons data1 (make-list (1- ncols) "")))
+                     " & ")
+          " \\\\"))
+
+(defun writing-schedule--timeblock-preamble ()
+  "Return the LaTeX preamble for a time-block sheet."
+  (concat "\\documentclass{article}\n"
+          "\\usepackage{array}\n"
+          "\\usepackage{arydshln}\n"
+          "\\usepackage{helvet}\n"
+          "\\renewcommand{\\familydefault}{\\sfdefault}\n"
+          "\\usepackage[margin=0.5in]{geometry}\n"
+          "\\usepackage{booktabs}\n"
+          "\\renewcommand{\\arraystretch}{0.85}\n"))
+
+(defun writing-schedule--timeblock-page (date-str key-str cells lo hi ncols)
+  "Return one page of a sheet for hours LO to HI.
+DATE-STR heads the page, KEY-STR is the code key, and CELLS places the
+planned blocks in the first plan column."
+  (let ((sub writing-schedule-timeblock-subrows)
+        (rows '()))
+    (dolist (h (number-sequence lo hi))
+      (dotimes (sr sub)
+        (push (writing-schedule--timeblock-row
+               (if (= sr 0) (format "%d:00" h) "")
+               (or (cdr (assoc (cons h sr) cells)) "")
+               ncols)
+              rows))
+      (push "\\midrule" rows))
+    (setq rows (cdr rows))              ; drop the trailing midrule
+    (concat "{\\small\\noindent\\textbf{Key:}\\quad " key-str "}\n\n"
+            "\\begin{center}\n\\begin{tabular}{"
+            (writing-schedule--timeblock-colspec ncols) "}\n"
+            "\\toprule\n"
+            "\\multicolumn{" (number-to-string (1+ ncols)) "}{|l|}{Date: "
+            date-str "} \\\\\n\\midrule\n"
+            (writing-schedule--timeblock-row "" "" ncols) "\n"
+            (writing-schedule--timeblock-row "" "" ncols) "\n\\midrule\n"
+            (mapconcat #'identity (nreverse rows) "\n") "\n"
+            "\\bottomrule\n\\end{tabular}\n\\end{center}\n")))
+
+(defun writing-schedule--timeblock-day (date-str key-str cells)
+  "Return the two pages of a sheet for DATE-STR, KEY-STR, and CELLS."
+  (let* ((lo writing-schedule-timeblock-start-hour)
+         (hi writing-schedule-timeblock-end-hour)
+         (ncols writing-schedule-timeblock-columns)
+         (total (1+ (- hi lo)))
+         (mid (+ lo (/ (1+ total) 2) -1)))
+    (concat (writing-schedule--timeblock-page date-str key-str cells lo mid ncols)
+            "\n\\newpage\n"
+            (writing-schedule--timeblock-page date-str key-str cells
+                                              (1+ mid) hi ncols))))
+
+(defun writing-schedule--timeblock-document (key-str days)
+  "Return a full LaTeX document from KEY-STR and DAYS.
+DAYS is a list of (DATE-STR . CELLS)."
+  (concat (writing-schedule--timeblock-preamble)
+          "\n\\begin{document}\n\n"
+          (mapconcat (lambda (day)
+                       (writing-schedule--timeblock-day (car day) key-str (cdr day)))
+                     days "\n\\clearpage\n")
+          "\n\\end{document}\n"))
+
+(defun writing-schedule--timeblock-days (parsed monday-abs)
+  "Return (KEY-STR . DAYS) for PARSED starting at MONDAY-ABS.
+DAYS is a list of (DATE-STR . CELLS), one per day column in the table."
+  (let* ((events (plist-get parsed :events))
+         (columns (plist-get parsed :columns))
+         (key (writing-schedule--timeblock-key (plist-get parsed :letters)
+                                               (plist-get parsed :legend)))
+         (offsets (sort (delete-dups (mapcar #'cdr columns)) #'<))
+         (days '()))
+    (dolist (off offsets)
+      (let* ((day-events (seq-filter (lambda (e) (= (plist-get e :offset) off)) events))
+             (abs (+ monday-abs off))
+             (greg (calendar-gregorian-from-absolute abs))
+             (date-str (format "%s (%s)" (writing-schedule--iso-date abs)
+                               (calendar-day-name greg))))
+        (push (cons date-str (writing-schedule--timeblock-cells day-events)) days)))
+    (cons key (nreverse days))))
+
+(defun writing-schedule--write-and-compile (tex-file content)
+  "Write CONTENT to TEX-FILE and compile it to PDF when a compiler exists.
+Return TEX-FILE."
+  (with-temp-file tex-file (insert content))
+  (let ((compiler (executable-find writing-schedule-latex-compiler)))
+    (if (not compiler)
+        (message "Wrote %s.  Install %s to make the PDF"
+                 tex-file writing-schedule-latex-compiler)
+      (let ((default-directory (file-name-directory tex-file)))
+        (call-process compiler nil nil nil "-interaction=nonstopmode"
+                      "-halt-on-error" (file-name-nondirectory tex-file)))))
+  tex-file)
+
+(defun writing-schedule--timeblock-generate (parsed monday per-day dir)
+  "Write time-block sheets for PARSED and MONDAY into DIR.
+PER-DAY writes one file per day, else one file for the week.  Return the
+list of files written."
+  (let* ((kd (writing-schedule--timeblock-days parsed monday))
+         (key (car kd))
+         (days (cdr kd))
+         (written '()))
+    (unless days (error "No day columns found in the table"))
+    (make-directory dir t)
+    (if per-day
+        (dolist (day days)
+          (let* ((date (car (split-string (car day) " ")))
+                 (tex (expand-file-name (format "sheet-%s.tex" date) dir)))
+            (writing-schedule--write-and-compile
+             tex (writing-schedule--timeblock-document key (list day)))
+            (push tex written)))
+      (let ((tex (expand-file-name
+                  (format "sheets-week-%s.tex" (writing-schedule--iso-date monday))
+                  dir)))
+        (writing-schedule--write-and-compile
+         tex (writing-schedule--timeblock-document key days))
+        (push tex written)))
+    (nreverse written)))
+
+;;;###autoload
+(defun writing-schedule-timeblock-sheets (&optional per-day)
+  "Generate printable time-block sheets from the table at point.
+For each day of the target week, write a two-page sheet with the planned
+blocks in the first plan column, the code key across the top, and the
+remaining columns blank.  As the day changes, you write a revised plan in
+the next column, which gives the schedule flexibility and antifragility.
+With a prefix argument, or PER-DAY non-nil, write one PDF per day.
+Otherwise write one PDF for the week.  Compile to PDF when a LaTeX
+compiler is available."
+  (interactive "P")
+  (unless (org-at-table-p)
+    (user-error "Point is not in an org table.  Move into your schedule table first"))
+  (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+         (monday (writing-schedule--week-monday
+                  (org-read-date nil t nil "Week for the sheets (any day in it): ")))
+         (files (writing-schedule--timeblock-generate
+                 parsed monday per-day (writing-schedule--sheets-directory))))
+    (message "Wrote %d sheet file%s to %s" (length files)
+             (if (= (length files) 1) "" "s") (writing-schedule--sheets-directory))
+    files))
+
+;;;###autoload
+(defun writing-schedule-batch-timeblock-sheets (table week &optional per-day out-dir)
+  "Generate time-block sheets from TABLE for WEEK.
+Non-nil PER-DAY writes one file per day, else one for the week.  OUT-DIR
+overrides the sheets directory.  Print the files written and return them.
+Meant to be called from a shell through emacs --batch."
+  (let ((table (expand-file-name table)))
+    (unless (file-readable-p table)
+      (error "Cannot read table file: %s" table))
+    (with-temp-buffer
+      (insert-file-contents table)
+      (org-mode)
+      (goto-char (point-min))
+      (unless (re-search-forward "^[ \t]*|" nil t)
+        (error "No org table found in %s" table))
+      (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+             (monday (writing-schedule--week-monday (org-read-date nil t week)))
+             (dir (if (and out-dir (not (string-empty-p out-dir)))
+                      (expand-file-name out-dir)
+                    (writing-schedule--sheets-directory)))
+             (files (writing-schedule--timeblock-generate parsed monday per-day dir)))
+        (dolist (f files) (princ (format "Wrote %s\n" f)))
+        files))))
+
 ;;;; Suggested key map
 
 ;;;###autoload (autoload 'writing-schedule-command-map "writing-schedule" nil t 'keymap)
@@ -854,6 +1099,7 @@ be called from a shell through emacs --batch."
     (define-key map "n" #'writing-schedule-new-week-from-template)
     (define-key map "f" #'writing-schedule-generate-from-template)
     (define-key map "s" #'writing-schedule-save-template-table)
+    (define-key map "b" #'writing-schedule-timeblock-sheets)
     (define-key map "o" #'writing-schedule-open-week)
     (define-key map "r" #'writing-schedule-open-recent)
     (define-key map "e" #'writing-schedule-export-ics)
@@ -866,8 +1112,8 @@ writing prefix, the following places the commands under C-c w c:
   (keymap-set my-writing-prefix \"c\" writing-schedule-command-map)
 
 The keys are g generate, t template, n new week from template,
-f generate from a saved table, s save table as template, o open week,
-r open recent, e export ics, and a add to agenda.")
+f generate from a saved table, s save table as template, b time-block
+sheets, o open week, r open recent, e export ics, and a add to agenda.")
 
 (provide 'writing-schedule)
 ;;; writing-schedule.el ends here

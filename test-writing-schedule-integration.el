@@ -801,5 +801,93 @@ newline is still saved with one."
       (delete-directory tpl-dir t)
       (delete-directory src-dir t))))
 
+(ert-deftest writing-schedule/integration/batch-timeblock-sheets-week ()
+  "One week file is written, and it is not compiled when no compiler exists."
+  :tags '(integration)
+  (let* ((src-dir (make-temp-file "ws-src" t))
+         (out-dir (make-temp-file "ws-out" t))
+         (src (expand-file-name "wk.org" src-dir))
+         (writing-schedule-latex-compiler "nonexistent-xyz"))
+    (unwind-protect
+        (progn
+          (with-temp-file src (insert writing-schedule-test--example))
+          (let ((files (with-temp-buffer
+                         (let ((standard-output (current-buffer)))
+                           (writing-schedule-batch-timeblock-sheets
+                            src "2026-01-21" nil out-dir)))))
+            (should (= (length files) 1))
+            (should (string-match-p "sheets-week-2026-01-19.tex" (car files)))
+            (should (file-exists-p (car files)))
+            (let ((tex (with-temp-buffer (insert-file-contents (car files)) (buffer-string))))
+              (should (string-match-p "Date: 2026-01-19 (Monday)" tex))
+              (should (string-match-p "Date: 2026-01-24 (Saturday)" tex)))))
+      (delete-directory src-dir t)
+      (delete-directory out-dir t))))
+
+(ert-deftest writing-schedule/integration/batch-timeblock-sheets-per-day ()
+  "One file is written per day, and the compiler is invoked when present."
+  :tags '(integration)
+  (let* ((src-dir (make-temp-file "ws-src" t))
+         (out-dir (make-temp-file "ws-out" t))
+         (src (expand-file-name "wk.org" src-dir))
+         (writing-schedule-latex-compiler "true"))
+    (unwind-protect
+        (progn
+          (with-temp-file src (insert writing-schedule-test--example))
+          (let ((files (with-temp-buffer
+                         (let ((standard-output (current-buffer)))
+                           (writing-schedule-batch-timeblock-sheets
+                            src "2026-01-21" t out-dir)))))
+            (should (= (length files) 6))
+            (should (cl-every (lambda (f)
+                                (string-match-p "sheet-2026-01-[0-9]+\\.tex" f))
+                              files))))
+      (delete-directory src-dir t)
+      (delete-directory out-dir t))))
+
+(ert-deftest writing-schedule/integration/batch-timeblock-sheets-errors ()
+  "Sheets signal for a missing file, no table, or no day columns."
+  :tags '(integration)
+  (let ((writing-schedule-latex-compiler "nonexistent-xyz"))
+    (should-error (writing-schedule-batch-timeblock-sheets "/no/such.org" "2026-01-21"))
+    (let ((f (make-temp-file "ws" nil ".org")))
+      (unwind-protect
+          (progn (with-temp-file f (insert "no table here\n"))
+                 (should-error (writing-schedule-batch-timeblock-sheets f "2026-01-21")))
+        (delete-file f)))
+    (let ((f (make-temp-file "ws" nil ".org")))
+      (unwind-protect
+          (progn (with-temp-file f (insert "| foo | bar |\n| 04:00-05:30 | A |\n"))
+                 (should-error (writing-schedule-batch-timeblock-sheets f "2026-01-21")))
+        (delete-file f)))))
+
+(ert-deftest writing-schedule/integration/timeblock-sheets-command ()
+  "The interactive command writes sheets for the chosen week."
+  :tags '(integration)
+  (let* ((out-dir (make-temp-file "ws-out" t))
+         (writing-schedule-sheets-directory out-dir)
+         (writing-schedule-latex-compiler "nonexistent-xyz"))
+    (unwind-protect
+        (with-temp-buffer
+          (insert writing-schedule-test--example)
+          (org-mode)
+          (goto-char (point-min))
+          (search-forward "|")
+          (cl-letf (((symbol-function 'org-read-date)
+                     (lambda (&rest _) (date-to-time "2026-01-21 12:00:00"))))
+            (let ((files (writing-schedule-timeblock-sheets)))
+              (should (= (length files) 1))
+              (should (file-exists-p (car files))))))
+      (delete-directory out-dir t))))
+
+(ert-deftest writing-schedule/integration/timeblock-sheets-command-needs-table ()
+  "The sheet command refuses when point is not in an org table."
+  :tags '(integration)
+  (with-temp-buffer
+    (org-mode)
+    (insert "no table here\n")
+    (goto-char (point-min))
+    (should-error (writing-schedule-timeblock-sheets) :type 'user-error)))
+
 (provide 'test-writing-schedule-integration)
 ;;; test-writing-schedule-integration.el ends here

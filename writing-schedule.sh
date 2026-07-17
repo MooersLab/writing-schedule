@@ -34,6 +34,7 @@ Usage:
   writing-schedule.sh template <1-4> [file]
   writing-schedule.sh generate <template-or-file> <date>
   writing-schedule.sh export <schedule.org>
+  writing-schedule.sh sheets <template-or-file> <date> [--per-day]
   writing-schedule.sh save <table-file> <name>
   writing-schedule.sh deps [--install]
   writing-schedule.sh help
@@ -48,6 +49,9 @@ Commands:
                                 <template> is a name from 'list' or a path to
                                 an .org table file.
   export <schedule.org>         Export an existing schedule file to .ics.
+  sheets <template> <date>      Write printable time-block sheets (LaTeX, and
+                                PDF when pdflatex is available) for the week.
+                                Add --per-day for one PDF per day.
   save <table-file> <name>      Save a table file into the template library
                                 under <name>.
   deps [--install]              Check dependencies. With --install, try to
@@ -198,6 +202,27 @@ cmd_generate() {
   echo "  Outlook (web):  Add calendar > Upload from file."
 }
 
+cmd_sheets() {
+  have_emacs || { install_emacs_hint; exit 1; }
+  local table_arg="${1:-}"
+  local week="${2:-}"
+  local per_day="nil"
+  if [ "${3:-}" = "--per-day" ] || [ "${3:-}" = "-d" ]; then per_day="t"; fi
+  if [ -z "$table_arg" ] || [ -z "$week" ]; then
+    echo "Usage: writing-schedule.sh sheets <template-or-file> <date> [--per-day]" >&2
+    exit 2
+  fi
+  local table
+  if ! table="$(resolve_table "$table_arg")"; then
+    echo "Could not find template or file: $table_arg" >&2
+    exit 1
+  fi
+  run_emacs "(writing-schedule-batch-timeblock-sheets \"$(esc "$table")\" \"$(esc "$week")\" $per_day)"
+  echo
+  echo "Print the PDF, then write your plan in the first column and revise"
+  echo "in the next column each time the day changes."
+}
+
 cmd_export() {
   have_emacs || { install_emacs_hint; exit 1; }
   local sched="${1:-}"
@@ -240,6 +265,7 @@ main() {
     template)       cmd_template "$@" ;;
     generate)       cmd_generate "$@" ;;
     export)         cmd_export "$@" ;;
+    sheets)         cmd_sheets "$@" ;;
     save)           cmd_save "$@" ;;
     deps)           check_deps "${1:-}" ;;
     help|-h|--help) usage ;;

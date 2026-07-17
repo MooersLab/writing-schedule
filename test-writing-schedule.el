@@ -399,6 +399,56 @@ and are used verbatim when set, at call time and in any load order."
     (should (string-match-p "| F: |" s))
     (should-not (string-match-p "| G: |" s))))
 
+(ert-deftest writing-schedule/timeblock/colspec ()
+  "The column spec has a narrow time column and N plan columns."
+  (should (equal (writing-schedule--timeblock-colspec 4)
+                 "|m{1cm}:m{4cm}:m{4cm}:m{4cm}:m{4cm}|"))
+  (should (equal (writing-schedule--timeblock-colspec 1) "|m{1cm}:m{4cm}|")))
+
+(ert-deftest writing-schedule/timeblock/latex-escape ()
+  "LaTeX special characters are escaped."
+  (should (equal (writing-schedule--latex-escape "a & b_c 50%") "a \\& b\\_c 50\\%"))
+  (should (equal (writing-schedule--latex-escape nil) "")))
+
+(ert-deftest writing-schedule/timeblock/cells-place-by-minute ()
+  "A block is placed in the sub-row matching its start minute."
+  (let ((writing-schedule-timeblock-subrows 5)
+        (events '((:letter "A" :start "04:00" :end "05:30" :offset 0)
+                  (:letter "B" :start "05:45" :end "07:15" :offset 0))))
+    (let ((cells (writing-schedule--timeblock-cells events)))
+      (should (string-prefix-p "A" (cdr (assoc '(4 . 0) cells))))
+      (should (string-prefix-p "B" (cdr (assoc '(5 . 3) cells)))))))
+
+(ert-deftest writing-schedule/timeblock/sheets-directory ()
+  "The sheets directory derives from the base, or is used verbatim."
+  (let ((writing-schedule-directory "/tmp/base")
+        (writing-schedule-sheets-directory nil))
+    (should (string= (writing-schedule--sheets-directory) "/tmp/base/sheets")))
+  (let ((writing-schedule-sheets-directory "/custom/sheets"))
+    (should (string= (writing-schedule--sheets-directory) "/custom/sheets"))))
+
+(ert-deftest writing-schedule/timeblock/document-content ()
+  "The document carries the key, the dates, the plan, and page breaks."
+  (let* ((table '(("Time <l>" "M" "Tu")
+                  hline
+                  ("Gen:" "" "")
+                  ("04:00-05:30" "A" "EM")
+                  hline
+                  ("A: docking" "" "")
+                  ("EM: email" "" "")))
+         (parsed (writing-schedule--parse table))
+         (monday (calendar-absolute-from-gregorian '(1 19 2026)))
+         (kd (writing-schedule--timeblock-days parsed monday))
+         (doc (writing-schedule--timeblock-document (car kd) (cdr kd))))
+    (should (string-match-p "A = docking" doc))
+    (should (string-match-p "EM = email" doc))
+    (should (string-match-p "Date: 2026-01-19 (Monday)" doc))
+    (should (string-match-p "Date: 2026-01-20 (Tuesday)" doc))
+    (should (string-match-p "4:00-5:30" doc))
+    (should (string-match-p "\\\\newpage" doc))
+    (should (string-match-p "\\\\clearpage" doc))
+    (should (string-match-p "\\\\documentclass{article}" doc))))
+
 ;;;; writing-schedule--legend-mapping
 
 (ert-deftest writing-schedule/legend-mapping/uses-legend-descriptions ()

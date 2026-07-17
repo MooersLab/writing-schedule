@@ -12,7 +12,7 @@ calendar.
 
 ![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.1.0&color=blue)
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
-![Tests](https://img.shields.io/badge/tests-83%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-93%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 ![Google Calendar](https://img.shields.io/badge/Google_Calendar-import-4285F4?logo=googlecalendar&logoColor=white)
@@ -42,6 +42,7 @@ blocks.*
 ## Features
 
 - Insert a blank template for up to 26 projects, or use your own short uppercase codes.
+- Print two-page time-block sheets for a week, with the plan in the first column and blank columns for revisions.
 - Parse a filled table into dated, timed org events.
 - Prompt for a project code and description per letter, with legend rows
   supplying the defaults.
@@ -81,6 +82,7 @@ examples/projects-and-tasks.org            An example mixing projects and two-le
 writing-schedule/                          Archive directory of dated weekly files.
   templates/                               Saved context templates (filled tables).
   tables/                                  This week's working table, copied from a template.
+  sheets/                                  Printable time-block sheets (LaTeX and PDF).
 Makefile                                   Test, coverage, and lint targets.
 test/
   test-writing-schedule.el                 Unit tests.
@@ -111,6 +113,12 @@ The template and table directories default to `templates/` and `tables/` under
 base directory is enough and the load order does not matter. Set
 `writing-schedule-template-directory` or `writing-schedule-table-directory` only
 when you want templates or working tables somewhere else.
+
+![The ~/org/writing-schedule directory tree](imgs/writing-schedule-tree.png)
+
+*Where files live. Each week is archived as its own dated `.org` schedule
+with a matching `.ics`. Your filled tables sit in `templates/`, and the
+week you are working on is copied into `tables/`.*
 
 ## Running the package: a tutorial
 
@@ -266,6 +274,35 @@ M-x writing-schedule-save-template-table
 It prompts for a name and writes the table to your template directory, so
 it joins the library for later use.
 
+### 7. Print a time-block sheet
+
+A schedule is a plan, and a plan meets a day of interruptions and
+opportunities. Printable time-block sheets let the plan bend without
+breaking. Put point in the table and run:
+
+```
+M-x writing-schedule-timeblock-sheets
+```
+
+Choose the week, then choose one PDF for the whole week or one PDF per
+day. Each day becomes a two-page sheet. The code key runs across the top,
+the day's planned blocks fill the first column, and the columns to its
+right stay blank.
+
+You print the sheet and carry it. The first column is the plan you made
+at the start of the week. When the day changes, meaning an interruption
+or an opportunity arrives, you write the revised plan in the second
+column at the point of change. A later change goes in the third column,
+and another in the fourth. The sheet thus records not only the plan but
+how the day actually unfolded, so disruption makes the record richer
+rather than poorer. That is the antifragile part, because the schedule
+gains from the very changes that would derail a rigid plan.
+
+The sheets are written to a `sheets/` subdirectory and compiled to PDF
+when `pdflatex` is available. Otherwise the LaTeX files are left for you
+to compile. The hours, the number of columns, and the sheet directory are
+all customizable.
+
 ### Feeding the agenda
 
 Add your task file, the schedule file, and any project logs to the agenda
@@ -291,12 +328,14 @@ so all three become sources of TODO items and timed blocks.
 | `writing-schedule-new-week-from-template` | Copy a saved template into this week and open it, ready to generate |
 | `writing-schedule-generate-from-template` | Select a saved table and generate the schedule from it directly |
 | `writing-schedule-save-template-table`          | Save the edited table at point as a named template |
+| `writing-schedule-timeblock-sheets`             | Print two-page time-block sheets for the week      |
 
 ## Key bindings
 
 The package ships a prefix keymap, `writing-schedule-command-map`, that
 puts the commands on single keys: `g` generate, `t` template, `n` new
-week from template, `f` generate from a saved table, `s` save table as template, `o` open
+week from template, `f` generate from a saved table, `s` save table as template, `b`
+time-block sheets, `o` open
 week, `r` open recent, `e` export ics, and `a` add to agenda. Bind it
 under any prefix you like. When `C-c w` is already your writing prefix,
 nest it on a free key such as `c`.
@@ -322,6 +361,7 @@ adds which-key labels.
       "C-c w c n" "new week from template"
       "C-c w c f" "generate from table"
       "C-c w c s" "save table as template"
+      "C-c w c b" "time-block sheets"
       "C-c w c o" "open week"
       "C-c w c r" "open recent"
       "C-c w c e" "export ics"
@@ -387,6 +427,7 @@ The commands are:
 ./writing-schedule.sh template 4 heavy.org       # or write it to a file
 ./writing-schedule.sh generate three-projects 2026-01-21   # table + date -> schedule + .ics
 ./writing-schedule.sh export writing-2026-01-19.org        # re-export a schedule to .ics
+./writing-schedule.sh sheets three-projects 2026-01-21     # printable time-block sheets (add --per-day)
 ./writing-schedule.sh save heavy.org grant-week  # save a table file into the library
 ./writing-schedule.sh deps                       # check that Emacs is available
 ./writing-schedule.sh help
@@ -509,7 +550,7 @@ make coverage EMACS_DIR=~/e30fewpackages
 ```
 
 For an HTML report, run `make coverage-html` and open `htmlcov/index.html`.
-The current suite reports 100 percent line coverage across 83 tests. The
+The current suite reports 100 percent line coverage across 93 tests. The
 `make coverage-check` target fails the build if coverage falls below 90
 percent, which suits a continuous-integration gate.
 
