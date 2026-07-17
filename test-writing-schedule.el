@@ -410,14 +410,36 @@ and are used verbatim when set, at call time and in any load order."
   (should (equal (writing-schedule--latex-escape "a & b_c 50%") "a \\& b\\_c 50\\%"))
   (should (equal (writing-schedule--latex-escape nil) "")))
 
-(ert-deftest writing-schedule/timeblock/cells-place-by-minute ()
-  "A block is placed in the sub-row matching its start minute."
+(ert-deftest writing-schedule/timeblock/spans-cover-the-range ()
+  "A block span runs from its start row to its end row."
   (let ((writing-schedule-timeblock-subrows 5)
-        (events '((:letter "A" :start "04:00" :end "05:30" :offset 0)
-                  (:letter "B" :start "05:45" :end "07:15" :offset 0))))
-    (let ((cells (writing-schedule--timeblock-cells events)))
-      (should (string-prefix-p "A" (cdr (assoc '(4 . 0) cells))))
-      (should (string-prefix-p "B" (cdr (assoc '(5 . 3) cells)))))))
+        (events '((:letter "A" :start "04:00" :end "05:30" :offset 0))))
+    (let* ((spans (writing-schedule--timeblock-spans events))
+           (s (car spans)))
+      ;; start 4:00 -> row 20, end 5:30 -> row 27 (floor of the sub-row)
+      (should (= (nth 0 s) 20))
+      (should (= (nth 1 s) 27))
+      (should (string-prefix-p "A" (nth 2 s)))))
+  ;; A block shorter than one sub-row still spans at least one row.
+  (let ((writing-schedule-timeblock-subrows 5)
+        (events '((:letter "X" :start "04:00" :end "04:10" :offset 0))))
+    (let ((s (car (writing-schedule--timeblock-spans events))))
+      (should (= (nth 1 s) (1+ (nth 0 s)))))))
+
+(ert-deftest writing-schedule/timeblock/document-has-block-outline ()
+  "The document draws a block with heavy rules and boxed cells."
+  (let* ((table '(("Time <l>" "M")
+                  hline
+                  ("04:00-05:30" "A")
+                  hline
+                  ("A: docking" "")))
+         (parsed (writing-schedule--parse table))
+         (monday (calendar-absolute-from-gregorian '(1 19 2026)))
+         (kd (writing-schedule--timeblock-days parsed monday))
+         (doc (writing-schedule--timeblock-document (car kd) (cdr kd))))
+    (should (string-match-p "cmidrule\\[1pt\\]{2-2}" doc))
+    (should (string-match-p "vrule width 1pt" doc))
+    (should (string-match-p "4:00-5:30" doc))))
 
 (ert-deftest writing-schedule/timeblock/sheets-directory ()
   "The sheets directory derives from the base, or is used verbatim."
@@ -448,6 +470,26 @@ and are used verbatim when set, at call time and in any load order."
     (should (string-match-p "\\\\newpage" doc))
     (should (string-match-p "\\\\clearpage" doc))
     (should (string-match-p "\\\\documentclass{article}" doc))))
+
+(ert-deftest writing-schedule/timeblock/org-document ()
+  "The org export carries a key, per-day tables, and the margin header."
+  (let* ((table '(("Time <l>" "M" "Tu")
+                  hline
+                  ("04:00-05:30" "A" "EM")
+                  hline
+                  ("A: docking" "" "")
+                  ("EM: email" "" "")))
+         (parsed (writing-schedule--parse table))
+         (monday (calendar-absolute-from-gregorian '(1 19 2026)))
+         (org (writing-schedule--timeblock-org-document parsed monday)))
+    (should (string-match-p "#\\+TITLE: Time-Block Sheets, week of 2026-01-19" org))
+    (should (string-match-p "usepackage\\[margin=0.5in\\]{geometry}" org))
+    (should (string-match-p "=A= :: docking" org))
+    (should (string-match-p "^\\* 2026-01-19 (Monday)" org))
+    (should (string-match-p "^\\* 2026-01-20 (Tuesday)" org))
+    (should (string-match-p ":booktabs t" org))
+    (should (string-match-p "| Time | Code | Task | Revision |" org))
+    (should (string-match-p "| 4:00-5:30 | A | docking | |" org))))
 
 ;;;; writing-schedule--legend-mapping
 

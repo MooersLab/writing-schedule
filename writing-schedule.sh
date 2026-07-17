@@ -217,10 +217,12 @@ cmd_sheets() {
     echo "Could not find template or file: $table_arg" >&2
     exit 1
   fi
-  run_emacs "(writing-schedule-batch-timeblock-sheets \"$(esc "$table")\" \"$(esc "$week")\" $per_day)"
+  run_emacs "(writing-schedule-batch-timeblock-sheets \"$(esc "$table")\" \"$(esc "$week")\" $per_day nil \"both\")"
   echo
+  echo "The week PDF and an editable org file were written."
   echo "Print the PDF, then write your plan in the first column and revise"
-  echo "in the next column each time the day changes."
+  echo "in the next column each time the day changes.  Edit the org file to"
+  echo "adjust the event tables and export the schedule to HTML or LaTeX."
 }
 
 cmd_export() {

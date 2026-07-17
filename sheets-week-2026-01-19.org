@@ -1,0 +1,97 @@
+#+TITLE: Time-Block Sheets, week of 2026-01-19
+#+LaTeX_HEADER: \usepackage[margin=0.5in]{geometry}
+#+OPTIONS: toc:nil
+
+* Key
+- =A= :: DNPH1 docking
+- =B= :: DUSP1 radiation
+- =CE= :: commute in evening
+- =CM= :: commute in morning
+- =EM= :: email
+- =EX= :: exercise
+- =LC= :: lawn care
+- =LP= :: lecture prep
+- =RT= :: required training
+- =TP= :: talk prep
+- =TT= :: time tracking
+- =W= :: 2026words
+
+* 2026-01-19 (Monday)
+#+CAPTION: Planned time blocks for 2026-01-19 (Monday).
+#+ATTR_LATEX: :booktabs t
+| Time | Code | Task | Revision |
+|-
+| 4:00-5:30 | A | DNPH1 docking | |
+| 5:45-7:15 | A | DNPH1 docking | |
+| 7:30-9:00 | EX | exercise | |
+| 8:15-8:45 | CM | commute in morning | |
+| 9:15-10:45 | B | DUSP1 radiation | |
+| 11:30-13:00 | A | DNPH1 docking | |
+| 13:15-14:45 | EM | email | |
+| 16:45-17:15 | CE | commute in evening | |
+
+* 2026-01-20 (Tuesday)
+#+CAPTION: Planned time blocks for 2026-01-20 (Tuesday).
+#+ATTR_LATEX: :booktabs t
+| Time | Code | Task | Revision |
+|-
+| 4:00-5:30 | B | DUSP1 radiation | |
+| 5:45-7:15 | B | DUSP1 radiation | |
+| 7:30-9:00 | EX | exercise | |
+| 8:15-8:45 | CM | commute in morning | |
+| 9:15-10:45 | A | DNPH1 docking | |
+| 11:30-13:00 | B | DUSP1 radiation | |
+| 13:15-14:45 | EM | email | |
+| 16:45-17:15 | CE | commute in evening | |
+
+* 2026-01-21 (Wednesday)
+#+CAPTION: Planned time blocks for 2026-01-21 (Wednesday).
+#+ATTR_LATEX: :booktabs t
+| Time | Code | Task | Revision |
+|-
+| 4:00-5:30 | A | DNPH1 docking | |
+| 5:45-7:15 | A | DNPH1 docking | |
+| 7:30-9:00 | EX | exercise | |
+| 8:15-8:45 | CM | commute in morning | |
+| 9:15-10:45 | B | DUSP1 radiation | |
+| 11:30-13:00 | A | DNPH1 docking | |
+| 13:15-14:45 | RT | required training | |
+| 16:45-17:15 | CE | commute in evening | |
+
+* 2026-01-22 (Thursday)
+#+CAPTION: Planned time blocks for 2026-01-22 (Thursday).
+#+ATTR_LATEX: :booktabs t
+| Time | Code | Task | Revision |
+|-
+| 4:00-5:30 | B | DUSP1 radiation | |
+| 5:45-7:15 | B | DUSP1 radiation | |
+| 7:30-9:00 | EX | exercise | |
+| 8:15-8:45 | CM | commute in morning | |
+| 9:15-10:45 | A | DNPH1 docking | |
+| 11:30-13:00 | LP | lecture prep | |
+| 13:15-14:45 | EM | email | |
+| 16:45-17:15 | CE | commute in evening | |
+
+* 2026-01-23 (Friday)
+#+CAPTION: Planned time blocks for 2026-01-23 (Friday).
+#+ATTR_LATEX: :booktabs t
+| Time | Code | Task | Revision |
+|-
+| 4:00-5:30 | W | 2026words | |
+| 5:45-7:15 | W | 2026words | |
+| 7:30-9:00 | EX | exercise | |
+| 8:15-8:45 | CM | commute in morning | |
+| 9:15-10:45 | TT | time tracking | |
+| 11:30-13:00 | TP | talk prep | |
+| 13:15-14:45 | EM | email | |
+| 16:45-17:15 | CE | commute in evening | |
+
+* 2026-01-24 (Saturday)
+#+CAPTION: Planned time blocks for 2026-01-24 (Saturday).
+#+ATTR_LATEX: :booktabs t
+| Time | Code | Task | Revision |
+|-
+| 5:45-7:15 | A | DNPH1 docking | |
+| 9:15-10:45 | LC | lawn care | |
+| 11:30-13:00 | A | DNPH1 docking | |
+| 13:15-14:45 | EM | email | |

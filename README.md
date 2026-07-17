@@ -12,7 +12,7 @@ calendar.
 
 ![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.1.0&color=blue)
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
-![Tests](https://img.shields.io/badge/tests-93%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-96%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 ![Google Calendar](https://img.shields.io/badge/Google_Calendar-import-4285F4?logo=googlecalendar&logoColor=white)
@@ -42,7 +42,8 @@ blocks.*
 ## Features
 
 - Insert a blank template for up to 26 projects, or use your own short uppercase codes.
-- Print two-page time-block sheets for a week, with the plan in the first column and blank columns for revisions.
+- Print two-page time-block sheets for a week, with each planned block drawn as an outlined box and blank columns for revisions.
+- Export the week to an editable org file of event tables for HTML or LaTeX.
 - Parse a filled table into dated, timed org events.
 - Prompt for a project code and description per letter, with legend rows
   supplying the defaults.
@@ -284,10 +285,13 @@ breaking. Put point in the table and run:
 M-x writing-schedule-timeblock-sheets
 ```
 
-Choose the week, then choose one PDF for the whole week or one PDF per
-day. Each day becomes a two-page sheet. The code key runs across the top,
-the day's planned blocks fill the first column, and the columns to its
-right stay blank.
+Choose the week, then choose the output, meaning the PDF, an editable org
+file, or both. Each day becomes a two-page sheet. The code key runs
+across the top, the day's planned blocks appear in the first column, and
+the columns to its right stay blank. Each block is drawn as a box with
+heavy lines that spans its time range, so you do not have to draw the
+blocks yourself. A block that crosses the page break is left open at the
+edge, so it still reads as one block.
 
 You print the sheet and carry it. The first column is the plan you made
 at the start of the week. When the day changes, meaning an interruption
@@ -298,9 +302,11 @@ how the day actually unfolded, so disruption makes the record richer
 rather than poorer. That is the antifragile part, because the schedule
 gains from the very changes that would derail a rigid plan.
 
-The sheets are written to a `sheets/` subdirectory and compiled to PDF
-when `pdflatex` is available. Otherwise the LaTeX files are left for you
-to compile. The hours, the number of columns, and the sheet directory are
+The org output is a companion file with one table of events per day, so
+you can edit the tables and export the week to HTML or LaTeX. The PDF
+sheets are written to a `sheets/` subdirectory and compiled when
+`pdflatex` is available. Otherwise the LaTeX files are left for you to
+compile. The hours, the number of columns, and the sheet directory are
 all customizable.
 
 ### Feeding the agenda
@@ -427,7 +433,7 @@ The commands are:
 ./writing-schedule.sh template 4 heavy.org       # or write it to a file
 ./writing-schedule.sh generate three-projects 2026-01-21   # table + date -> schedule + .ics
 ./writing-schedule.sh export writing-2026-01-19.org        # re-export a schedule to .ics
-./writing-schedule.sh sheets three-projects 2026-01-21     # printable time-block sheets (add --per-day)
+./writing-schedule.sh sheets three-projects 2026-01-21     # week PDF sheets and an editable org file (add --per-day)
 ./writing-schedule.sh save heavy.org grant-week  # save a table file into the library
 ./writing-schedule.sh deps                       # check that Emacs is available
 ./writing-schedule.sh help
@@ -550,7 +556,7 @@ make coverage EMACS_DIR=~/e30fewpackages
 ```
 
 For an HTML report, run `make coverage-html` and open `htmlcov/index.html`.
-The current suite reports 100 percent line coverage across 93 tests. The
+The current suite reports 100 percent line coverage across 96 tests. The
 `make coverage-check` target fails the build if coverage falls below 90
 percent, which suits a continuous-integration gate.
 

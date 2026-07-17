@@ -903,23 +903,29 @@ When nil, derive a \"sheets\" subdirectory of `writing-schedule-directory'."
          ltr)))
    letters ",\\quad "))
 
-(defun writing-schedule--timeblock-cells (events)
-  "Return an alist mapping (HOUR . SUBROW) to a plan label for EVENTS.
-SUBROW places the block within its hour according to the start minute."
+(defun writing-schedule--timeblock-spans (events)
+  "Return block spans (START-ROW END-ROW LABEL) for EVENTS.
+A row index is HOUR times the sub-row count plus the sub-row.  START-ROW
+comes from the block start, END-ROW from the block end, so the span
+covers the whole time range."
   (let ((sub writing-schedule-timeblock-subrows)
-        (cells '()))
+        (spans '()))
     (dolist (ev events)
-      (let* ((start (plist-get ev :start))
-             (parts (split-string start ":"))
-             (h (string-to-number (car parts)))
-             (m (string-to-number (cadr parts)))
-             (sr (min (1- sub) (/ (* m sub) 60)))
+      (let* ((sp (split-string (plist-get ev :start) ":"))
+             (ep (split-string (plist-get ev :end) ":"))
+             (sh (string-to-number (car sp)))
+             (sm (string-to-number (cadr sp)))
+             (eh (string-to-number (car ep)))
+             (em (string-to-number (cadr ep)))
+             (sg (+ (* sh sub) (min (1- sub) (/ (* sm sub) 60))))
+             (eg (+ (* eh sub) (min sub (/ (* em sub) 60))))
              (label (format "%s\\quad %s-%s"
                             (plist-get ev :letter)
-                            (writing-schedule--hhmm-tidy start)
+                            (writing-schedule--hhmm-tidy (plist-get ev :start))
                             (writing-schedule--hhmm-tidy (plist-get ev :end)))))
-        (push (cons (cons h sr) label) cells)))
-    cells))
+        (when (<= eg sg) (setq eg (1+ sg)))
+        (push (list sg eg label) spans)))
+    spans))
 
 (defun writing-schedule--timeblock-row (timecol data1 ncols)
   "Return a table row of TIMECOL, DATA1, and blank cells filling NCOLS columns."
@@ -937,23 +943,41 @@ SUBROW places the block within its hour according to the start minute."
           "\\renewcommand{\\familydefault}{\\sfdefault}\n"
           "\\usepackage[margin=0.5in]{geometry}\n"
           "\\usepackage{booktabs}\n"
-          "\\renewcommand{\\arraystretch}{0.85}\n"))
+          "\\renewcommand{\\arraystretch}{0.8}\n"
+          "\\setlength{\\aboverulesep}{0pt}\n"
+          "\\setlength{\\belowrulesep}{0pt}\n"
+          "\\setlength{\\cmidrulewidth}{1pt}\n"))
 
-(defun writing-schedule--timeblock-page (date-str key-str cells lo hi ncols)
+(defun writing-schedule--timeblock-page (date-str key-str spans lo hi ncols)
   "Return one page of a sheet for hours LO to HI.
-DATE-STR heads the page, KEY-STR is the code key, and CELLS places the
-planned blocks in the first plan column."
+DATE-STR heads the page, KEY-STR is the code key, and SPANS draws each
+planned block as an outlined box with heavy rules in the first plan
+column.  A block that reaches the page edge is left open there, so a box
+that crosses the page break reads as one block."
   (let ((sub writing-schedule-timeblock-subrows)
-        (rows '()))
+        (lines '()))
     (dolist (h (number-sequence lo hi))
       (dotimes (sr sub)
-        (push (writing-schedule--timeblock-row
-               (if (= sr 0) (format "%d:00" h) "")
-               (or (cdr (assoc (cons h sr) cells)) "")
-               ncols)
-              rows))
-      (push "\\midrule" rows))
-    (setq rows (cdr rows))              ; drop the trailing midrule
+        (let* ((g (+ (* h sub) sr))
+               (inside (cl-find-if (lambda (s) (and (<= (nth 0 s) g) (< g (nth 1 s)))) spans))
+               (starts (cl-find-if (lambda (s) (= (nth 0 s) g)) spans))
+               (ends-after (cl-find-if (lambda (s) (= (nth 1 s) (1+ g))) spans))
+               (timecol (if (= sr 0) (format "%d:00" h) ""))
+               (label (if starts (nth 2 starts) ""))
+               (cell (if inside
+                         (format (concat "\\multicolumn{1}{!{\\vrule width 1pt}"
+                                         "m{4cm}!{\\vrule width 1pt}}{%s}")
+                                 label)
+                       label)))
+          (when starts (push "\\cmidrule[1pt]{2-2}" lines))
+          (push (concat (mapconcat #'identity
+                                   (cons timecol (cons cell (make-list (1- ncols) "")))
+                                   " & ")
+                        " \\\\")
+                lines)
+          (when ends-after (push "\\cmidrule[1pt]{2-2}" lines))))
+      (push "\\midrule" lines))
+    (setq lines (cdr lines))            ; drop the trailing midrule
     (concat "{\\small\\noindent\\textbf{Key:}\\quad " key-str "}\n\n"
             "\\begin{center}\n\\begin{tabular}{"
             (writing-schedule--timeblock-colspec ncols) "}\n"
@@ -962,24 +986,24 @@ planned blocks in the first plan column."
             date-str "} \\\\\n\\midrule\n"
             (writing-schedule--timeblock-row "" "" ncols) "\n"
             (writing-schedule--timeblock-row "" "" ncols) "\n\\midrule\n"
-            (mapconcat #'identity (nreverse rows) "\n") "\n"
+            (mapconcat #'identity (nreverse lines) "\n") "\n"
             "\\bottomrule\n\\end{tabular}\n\\end{center}\n")))
 
-(defun writing-schedule--timeblock-day (date-str key-str cells)
-  "Return the two pages of a sheet for DATE-STR, KEY-STR, and CELLS."
+(defun writing-schedule--timeblock-day (date-str key-str spans)
+  "Return the two pages of a sheet for DATE-STR, KEY-STR, and SPANS."
   (let* ((lo writing-schedule-timeblock-start-hour)
          (hi writing-schedule-timeblock-end-hour)
          (ncols writing-schedule-timeblock-columns)
          (total (1+ (- hi lo)))
          (mid (+ lo (/ (1+ total) 2) -1)))
-    (concat (writing-schedule--timeblock-page date-str key-str cells lo mid ncols)
+    (concat (writing-schedule--timeblock-page date-str key-str spans lo mid ncols)
             "\n\\newpage\n"
-            (writing-schedule--timeblock-page date-str key-str cells
+            (writing-schedule--timeblock-page date-str key-str spans
                                               (1+ mid) hi ncols))))
 
 (defun writing-schedule--timeblock-document (key-str days)
   "Return a full LaTeX document from KEY-STR and DAYS.
-DAYS is a list of (DATE-STR . CELLS)."
+DAYS is a list of (DATE-STR . SPANS)."
   (concat (writing-schedule--timeblock-preamble)
           "\n\\begin{document}\n\n"
           (mapconcat (lambda (day)
@@ -1002,8 +1026,58 @@ DAYS is a list of (DATE-STR . CELLS), one per day column in the table."
              (greg (calendar-gregorian-from-absolute abs))
              (date-str (format "%s (%s)" (writing-schedule--iso-date abs)
                                (calendar-day-name greg))))
-        (push (cons date-str (writing-schedule--timeblock-cells day-events)) days)))
+        (push (cons date-str (writing-schedule--timeblock-spans day-events)) days)))
     (cons key (nreverse days))))
+
+(defun writing-schedule--timeblock-org-document (parsed monday)
+  "Return an editable org document of the week's blocks for PARSED and MONDAY.
+Each day is a section with a table of Time, Code, Task, and a blank
+Revision column, so you can edit the events and export the schedule to
+HTML or other formats."
+  (let* ((events (plist-get parsed :events))
+         (columns (plist-get parsed :columns))
+         (letters (plist-get parsed :letters))
+         (legend (plist-get parsed :legend))
+         (offsets (sort (delete-dups (mapcar #'cdr columns)) #'<)))
+    (concat
+     (format "#+TITLE: Time-Block Sheets, week of %s\n"
+             (writing-schedule--iso-date monday))
+     "#+LaTeX_HEADER: \\usepackage[margin=0.5in]{geometry}\n"
+     "#+OPTIONS: toc:nil\n\n"
+     "* Key\n"
+     (mapconcat
+      (lambda (l)
+        (let ((d (cdr (assoc l legend))))
+          (format "- =%s=%s" l
+                  (if (and d (not (string-empty-p d))) (format " :: %s" d) ""))))
+      letters "\n")
+     "\n\n"
+     (mapconcat
+      (lambda (off)
+        (let* ((abs (+ monday off))
+               (greg (calendar-gregorian-from-absolute abs))
+               (date-str (format "%s (%s)" (writing-schedule--iso-date abs)
+                                 (calendar-day-name greg)))
+               (day-events
+                (sort (seq-filter (lambda (e) (= (plist-get e :offset) off)) events)
+                      (lambda (a b) (string< (plist-get a :start) (plist-get b :start))))))
+          (concat
+           (format "* %s\n" date-str)
+           (format "#+CAPTION: Planned time blocks for %s.\n" date-str)
+           "#+ATTR_LATEX: :booktabs t\n"
+           "| Time | Code | Task | Revision |\n|-\n"
+           (if day-events
+               (mapconcat
+                (lambda (e)
+                  (format "| %s-%s | %s | %s | |"
+                          (writing-schedule--hhmm-tidy (plist-get e :start))
+                          (writing-schedule--hhmm-tidy (plist-get e :end))
+                          (plist-get e :letter)
+                          (or (cdr (assoc (plist-get e :letter) legend)) "")))
+                day-events "\n")
+             "| | | | |")
+           "\n")))
+      offsets "\n"))))
 
 (defun writing-schedule--write-and-compile (tex-file content)
   "Write CONTENT to TEX-FILE and compile it to PDF when a compiler exists.
@@ -1018,59 +1092,70 @@ Return TEX-FILE."
                       "-halt-on-error" (file-name-nondirectory tex-file)))))
   tex-file)
 
-(defun writing-schedule--timeblock-generate (parsed monday per-day dir)
+(defun writing-schedule--timeblock-generate (parsed monday per-day dir format)
   "Write time-block sheets for PARSED and MONDAY into DIR.
-PER-DAY writes one file per day, else one file for the week.  Return the
-list of files written."
-  (let* ((kd (writing-schedule--timeblock-days parsed monday))
-         (key (car kd))
-         (days (cdr kd))
-         (written '()))
-    (unless days (error "No day columns found in the table"))
+PER-DAY writes one PDF per day, else one PDF for the week.  FORMAT is one
+of the symbols pdf, org, or both.  The org file is always a single week
+file.  Return the list of files written."
+  (let ((written '())
+        (stamp (writing-schedule--iso-date monday)))
+    (unless (delete-dups (mapcar #'cdr (plist-get parsed :columns)))
+      (error "No day columns found in the table"))
     (make-directory dir t)
-    (if per-day
-        (dolist (day days)
-          (let* ((date (car (split-string (car day) " ")))
-                 (tex (expand-file-name (format "sheet-%s.tex" date) dir)))
+    (when (memq format '(pdf both))
+      (let* ((kd (writing-schedule--timeblock-days parsed monday))
+             (key (car kd))
+             (days (cdr kd)))
+        (if per-day
+            (dolist (day days)
+              (let* ((date (car (split-string (car day) " ")))
+                     (tex (expand-file-name (format "sheet-%s.tex" date) dir)))
+                (writing-schedule--write-and-compile
+                 tex (writing-schedule--timeblock-document key (list day)))
+                (push tex written)))
+          (let ((tex (expand-file-name (format "sheets-week-%s.tex" stamp) dir)))
             (writing-schedule--write-and-compile
-             tex (writing-schedule--timeblock-document key (list day)))
-            (push tex written)))
-      (let ((tex (expand-file-name
-                  (format "sheets-week-%s.tex" (writing-schedule--iso-date monday))
-                  dir)))
-        (writing-schedule--write-and-compile
-         tex (writing-schedule--timeblock-document key days))
-        (push tex written)))
+             tex (writing-schedule--timeblock-document key days))
+            (push tex written)))))
+    (when (memq format '(org both))
+      (let ((org (expand-file-name (format "sheets-week-%s.org" stamp) dir)))
+        (with-temp-file org
+          (insert (writing-schedule--timeblock-org-document parsed monday)))
+        (push org written)))
     (nreverse written)))
 
 ;;;###autoload
 (defun writing-schedule-timeblock-sheets (&optional per-day)
   "Generate printable time-block sheets from the table at point.
-For each day of the target week, write a two-page sheet with the planned
-blocks in the first plan column, the code key across the top, and the
-remaining columns blank.  As the day changes, you write a revised plan in
-the next column, which gives the schedule flexibility and antifragility.
-With a prefix argument, or PER-DAY non-nil, write one PDF per day.
-Otherwise write one PDF for the week.  Compile to PDF when a LaTeX
-compiler is available."
+Each day becomes a two-page sheet with the planned blocks drawn as
+outlined boxes in the first plan column, the code key across the top, and
+the remaining columns blank.  As the day changes, you write a revised
+plan in the next column, which gives the schedule flexibility and
+antifragility.  With a prefix argument, or PER-DAY non-nil, write one PDF
+per day.  Otherwise write one PDF for the week.  You also choose the
+output, meaning the PDF, an editable org file, or both.  PDFs compile
+when a LaTeX compiler is available."
   (interactive "P")
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
   (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+         (format (intern (completing-read "Output (pdf, org, both): "
+                                          '("pdf" "org" "both") nil t nil nil "both")))
          (monday (writing-schedule--week-monday
                   (org-read-date nil t nil "Week for the sheets (any day in it): ")))
          (files (writing-schedule--timeblock-generate
-                 parsed monday per-day (writing-schedule--sheets-directory))))
+                 parsed monday per-day (writing-schedule--sheets-directory) format)))
     (message "Wrote %d sheet file%s to %s" (length files)
              (if (= (length files) 1) "" "s") (writing-schedule--sheets-directory))
     files))
 
 ;;;###autoload
-(defun writing-schedule-batch-timeblock-sheets (table week &optional per-day out-dir)
+(defun writing-schedule-batch-timeblock-sheets (table week &optional per-day out-dir format)
   "Generate time-block sheets from TABLE for WEEK.
-Non-nil PER-DAY writes one file per day, else one for the week.  OUT-DIR
-overrides the sheets directory.  Print the files written and return them.
-Meant to be called from a shell through emacs --batch."
+Non-nil PER-DAY writes one PDF per day, else one for the week.  OUT-DIR
+overrides the sheets directory.  FORMAT is the string \"pdf\", \"org\",
+or \"both\", and defaults to both.  Print the files written and return
+them.  Meant to be called from a shell through emacs --batch."
   (let ((table (expand-file-name table)))
     (unless (file-readable-p table)
       (error "Cannot read table file: %s" table))
@@ -1085,7 +1170,10 @@ Meant to be called from a shell through emacs --batch."
              (dir (if (and out-dir (not (string-empty-p out-dir)))
                       (expand-file-name out-dir)
                     (writing-schedule--sheets-directory)))
-             (files (writing-schedule--timeblock-generate parsed monday per-day dir)))
+             (fmt (if (and format (not (string-empty-p format)))
+                      (intern format)
+                    'both))
+             (files (writing-schedule--timeblock-generate parsed monday per-day dir fmt)))
         (dolist (f files) (princ (format "Wrote %s\n" f)))
         files))))
 

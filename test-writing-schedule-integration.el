@@ -802,7 +802,7 @@ newline is still saved with one."
       (delete-directory src-dir t))))
 
 (ert-deftest writing-schedule/integration/batch-timeblock-sheets-week ()
-  "One week file is written, and it is not compiled when no compiler exists."
+  "The default writes a week PDF source and an editable org file."
   :tags '(integration)
   (let* ((src-dir (make-temp-file "ws-src" t))
          (out-dir (make-temp-file "ws-out" t))
@@ -815,17 +815,19 @@ newline is still saved with one."
                          (let ((standard-output (current-buffer)))
                            (writing-schedule-batch-timeblock-sheets
                             src "2026-01-21" nil out-dir)))))
-            (should (= (length files) 1))
-            (should (string-match-p "sheets-week-2026-01-19.tex" (car files)))
-            (should (file-exists-p (car files)))
-            (let ((tex (with-temp-buffer (insert-file-contents (car files)) (buffer-string))))
-              (should (string-match-p "Date: 2026-01-19 (Monday)" tex))
-              (should (string-match-p "Date: 2026-01-24 (Saturday)" tex)))))
+            (should (= (length files) 2))
+            (should (cl-find-if (lambda (f) (string-match-p "sheets-week-2026-01-19.tex" f)) files))
+            (let ((org (cl-find-if (lambda (f) (string-match-p "\\.org\\'" f)) files)))
+              (should org)
+              (let ((text (with-temp-buffer (insert-file-contents org) (buffer-string))))
+                (should (string-match-p "Date\\|Time-Block Sheets" text))
+                (should (string-match-p "^\\* 2026-01-19 (Monday)" text))
+                (should (string-match-p "^\\* 2026-01-24 (Saturday)" text))))))
       (delete-directory src-dir t)
       (delete-directory out-dir t))))
 
 (ert-deftest writing-schedule/integration/batch-timeblock-sheets-per-day ()
-  "One file is written per day, and the compiler is invoked when present."
+  "One PDF source is written per day when the format is pdf."
   :tags '(integration)
   (let* ((src-dir (make-temp-file "ws-src" t))
          (out-dir (make-temp-file "ws-out" t))
@@ -837,11 +839,31 @@ newline is still saved with one."
           (let ((files (with-temp-buffer
                          (let ((standard-output (current-buffer)))
                            (writing-schedule-batch-timeblock-sheets
-                            src "2026-01-21" t out-dir)))))
+                            src "2026-01-21" t out-dir "pdf")))))
             (should (= (length files) 6))
             (should (cl-every (lambda (f)
                                 (string-match-p "sheet-2026-01-[0-9]+\\.tex" f))
                               files))))
+      (delete-directory src-dir t)
+      (delete-directory out-dir t))))
+
+(ert-deftest writing-schedule/integration/batch-timeblock-sheets-org-only ()
+  "The org format writes a single editable week file."
+  :tags '(integration)
+  (let* ((src-dir (make-temp-file "ws-src" t))
+         (out-dir (make-temp-file "ws-out" t))
+         (src (expand-file-name "wk.org" src-dir)))
+    (unwind-protect
+        (progn
+          (with-temp-file src (insert writing-schedule-test--example))
+          (let ((files (with-temp-buffer
+                         (let ((standard-output (current-buffer)))
+                           (writing-schedule-batch-timeblock-sheets
+                            src "2026-01-21" nil out-dir "org")))))
+            (should (= (length files) 1))
+            (should (string-match-p "sheets-week-2026-01-19.org" (car files)))
+            (let ((text (with-temp-buffer (insert-file-contents (car files)) (buffer-string))))
+              (should (string-match-p "| Time | Code | Task | Revision |" text)))))
       (delete-directory src-dir t)
       (delete-directory out-dir t))))
 
@@ -874,7 +896,9 @@ newline is still saved with one."
           (goto-char (point-min))
           (search-forward "|")
           (cl-letf (((symbol-function 'org-read-date)
-                     (lambda (&rest _) (date-to-time "2026-01-21 12:00:00"))))
+                     (lambda (&rest _) (date-to-time "2026-01-21 12:00:00")))
+                    ((symbol-function 'completing-read)
+                     (lambda (&rest _) "pdf")))
             (let ((files (writing-schedule-timeblock-sheets)))
               (should (= (length files) 1))
               (should (file-exists-p (car files))))))
