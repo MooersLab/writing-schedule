@@ -1,5 +1,14 @@
 # writing-schedule.el
 
+![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.1.0&color=blue)
+![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
+![Tests](https://img.shields.io/badge/tests-97%20passing-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
+![License](https://img.shields.io/badge/license-GPL--3.0-blue)
+![Google Calendar](https://img.shields.io/badge/Google_Calendar-import-4285F4?logo=googlecalendar&logoColor=white)
+![Apple Calendar](https://img.shields.io/badge/Apple_Calendar-import-000000?logo=apple&logoColor=white)
+![Outlook](https://img.shields.io/badge/Outlook-import-0078D4?logo=microsoftoutlook&logoColor=white)
+
 Turn a weekly writing-block table into org agenda events and an iCalendar
 file you can import into Outlook Web or any calendar application. Run from
 inside Emacs for use with org-agenda, or for non-Emacs users, from the
@@ -10,23 +19,15 @@ activity, like writing code, working on email, yard work, exercising,
 buying groceries, and so on. Rare events are best added manually to the
 calendar.
 
-![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.1.0&color=blue)
-![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
-![Tests](https://img.shields.io/badge/tests-97%20passing-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Google Calendar](https://img.shields.io/badge/Google_Calendar-import-4285F4?logo=googlecalendar&logoColor=white)
-![Apple Calendar](https://img.shields.io/badge/Apple_Calendar-import-000000?logo=apple&logoColor=white)
-![Outlook](https://img.shields.io/badge/Outlook-import-0078D4?logo=microsoftoutlook&logoColor=white)
-
 You keep a weekly plan as an org table. Each row is a time block, each
 column after the first is a day, and each filled cell holds a short
 uppercase code that names the project or task worked on during that
 block, for example A, B, or a two-letter task code such as EM for email.
-A table can hold many codes, so it is not limited to four projects. This
-package reads that table and writes a schedule file of dated events.
-Those events feed the org agenda, and org's own iCalendar exporter turns
-them into a file that Outlook Web or any calendar application can import.
+A table can hold up to 26 single-letter projects or activities, and more
+when you use multi-letter codes. This package reads that table and writes
+a schedule file of dated events. Those events feed the org agenda, and
+org's own iCalendar exporter turns them into a file that Outlook Web or
+any calendar application can import.
 
 The table is a seating chart. You decide who sits where, meaning which
 project fills which block. The generator is the usher that walks the
@@ -41,6 +42,22 @@ The generator writes a dated schedule file that feeds org-agenda, and,
 through org's iCalendar exporter, a `.ics` file that Google Calendar or
 Outlook Calendar can import. The sheet command writes a LaTeX time-block
 sheet that becomes a PDF, and an org file that exports to HTML.*
+
+## An example of the flexible nature of time blocks
+
+![A time block shifted to later start times across successive columns](imgs/shiftingTimeBlock.png)
+
+In this snapshot from an exported PDF, two projects are being worked on
+during a conference week. They are represented in the table by the
+letters A and B. The time block for the second project appears on a later
+day, so it is not shown here. In this example, the user decided to go
+back to sleep several times, so they shifted the time block to later
+start times in each successive column. This demonstrates the flexibility
+of the time-blocking system proposed by Cal Newport. The rightmost filled
+column represents what actually happened during the day. If you track the
+time you spend on specific projects, the information in the rightmost
+column can be transferred to the table, spreadsheet, or database that you
+are using for tracking effort.
 
 ## Features
 
@@ -87,7 +104,7 @@ examples/projects-and-tasks.org            An example mixing projects and two-le
 writing-schedule/                          Archive directory of dated weekly files.
   templates/                               Saved context templates (filled tables).
   tables/                                  This week's working table, copied from a template.
-  sheets/                                  Printable time-block sheets (LaTeX and PDF).
+  sheets/                                  Printable time-block sheets (LaTeX, org, and PDF).
 Makefile                                   Test, coverage, and lint targets.
 test/
   test-writing-schedule.el                 Unit tests.
@@ -438,6 +455,65 @@ You do not need to know Emacs to get a calendar from a template. The
 `writing-schedule.sh` script uses Emacs only as an engine, and it mirrors
 the package's capabilities, producing an iCalendar (`.ics`) file that you can
 import into Apple Calendar, Google Calendar, or Outlook Calendar.
+
+Install the script first, because it is not a standalone program. It calls
+`writing-schedule.el`, so both files have to be on your machine. Use either
+of the methods above, meaning clone or download the repository and put
+`writing-schedule.el` on your load path, or install the package with `M-x
+package-install`. The script and the elisp file ship together, so whichever
+method you choose, `writing-schedule.sh` arrives with it. Then make the
+script executable and check that it finds Emacs:
+
+```
+chmod +x writing-schedule.sh
+./writing-schedule.sh deps
+```
+
+### Installing with the Emacs package manager
+
+You run these commands inside Emacs once, and afterward you work entirely
+from the shell. `M-x` means pressing the Meta key, usually Alt or Option,
+together with `x`, which opens a prompt where you type a command name and
+press Return.
+
+Which command you want depends on where the package is coming from.
+
+- **From a downloaded file.** If you have `writing-schedule.el` on disk,
+  run `M-x package-install-file`, then type the path to the file and press
+  Return. Plain `M-x package-install` searches the configured package
+  archives, so it does not find a file sitting in your Downloads folder.
+- **From the repository, on Emacs 29 or newer.** Run `M-x
+  package-vc-install`, then paste the repository URL. Emacs clones the
+  repository into your package directory, which means you get
+  `writing-schedule.sh` alongside the elisp file, and `M-x
+  package-vc-upgrade` later pulls updates.
+- **From a package archive.** If the package is available from an archive
+  you have configured, such as MELPA, run `M-x package-refresh-contents`
+  first, so the archive listing is current, then `M-x package-install` and
+  type `writing-schedule`.
+
+The package requires Emacs 27.1 or newer. To confirm the install worked,
+run `M-x describe-package` and type `writing-schedule`, which shows the
+version and the directory the files landed in. That directory is the value
+you need for `WS_DIR` below. You can also find it without leaving the
+shell:
+
+```
+ls -d ~/.emacs.d/elpa/writing-schedule-*
+```
+
+The script looks for `writing-schedule.el` in its own directory. When you
+installed through the package manager, the elisp file sits in your package
+directory instead, so point the script at it with `WS_DIR`:
+
+```
+export WS_DIR=~/.emacs.d/elpa/writing-schedule-0.1.0
+```
+
+Add that line to your shell startup file, meaning `~/.bashrc` or
+`~/.zshrc`, so the setting survives a new terminal. If you installed with
+`package-vc-install`, the script itself lives in that same directory, so
+you can run it from there or copy it somewhere on your `PATH`.
 
 ![From an edited table to timed blocks in your calendar](imgs/writing-schedule-flow-sh.png)
 
