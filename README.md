@@ -1,4 +1,4 @@
-# writing-schedule.el
+# Antifragile time-blocking for deep work
 
 ![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.1.0&color=blue)
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
@@ -9,15 +9,16 @@
 ![Apple Calendar](https://img.shields.io/badge/Apple_Calendar-import-000000?logo=apple&logoColor=white)
 ![Outlook](https://img.shields.io/badge/Outlook-import-0078D4?logo=microsoftoutlook&logoColor=white)
 
-Turn a weekly writing-block table into org agenda events and an iCalendar
-file you can import into Outlook Web or any calendar application. Run from
-inside Emacs for use with org-agenda, or for non-Emacs users, from the
-shell with a bash script for use with iCal, Google Calendar, or Outlook
-Calendar. Originally
-designed to schedule writing, but it can be used for any recurring
-activity, like writing code, working on email, yard work, exercising,
-buying groceries, and so on. Rare events are best added manually to the
-calendar.
+`writing-schedule.el` turns a weekly writing-block table into org agenda
+events and an iCalendar file you can import into Outlook Web or any
+calendar application. It also exports the week's schedule to a PDF for
+printing to paper to track in ink the dynamic nature of what actually
+gets done. Run it from inside Emacs for use with org-agenda, or for
+non-Emacs users, from the shell with a bash script for use with iCal,
+Google Calendar, or Outlook Calendar. Originally designed to schedule
+writing, but it can be used for any recurring activity, like writing
+code, working on email, yard work, exercising, buying groceries, and so
+on. Rare events are best added manually to the calendar.
 
 You keep a weekly plan as an org table. Each row is a time block, each
 column after the first is a day, and each filled cell holds a short
@@ -25,9 +26,11 @@ uppercase code that names the project or task worked on during that
 block, for example A, B, or a two-letter task code such as EM for email.
 A table can hold up to 26 single-letter projects or activities, and more
 when you use multi-letter codes. This package reads that table and writes
-a schedule file of dated events. Those events feed the org agenda, and
-org's own iCalendar exporter turns them into a file that Outlook Web or
-any calendar application can import.
+a schedule file of dated events. Those events feed org-agenda, and org's
+own iCalendar exporter turns them into a file that Outlook Web or any
+calendar application can import. The events can also be exported to a PDF
+for printing to paper for tracking the shifting nature of time blocks in
+successive columns (see the example below).
 
 The table is a seating chart. You decide who sits where, meaning which
 project fills which block. The generator is the usher that walks the
