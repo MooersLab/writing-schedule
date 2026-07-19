@@ -1,6 +1,7 @@
 ;;; writing-schedule.el --- Generate a weekly writing schedule and export to iCalendar -*- lexical-binding: t; -*-
 
 ;; Author: Blaine Mooers <blaine-mooers@ou.edu>
+;; Assisted-by: Claude Code:claude-opus-4-8
 ;; Maintainer: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "27.1"))
