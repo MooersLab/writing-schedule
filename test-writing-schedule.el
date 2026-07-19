@@ -1,5 +1,8 @@
 ;;; test-writing-schedule.el --- Unit tests for writing-schedule.el  -*- lexical-binding: t; -*-
 
+;; Author: Blaine Mooers <blaine-mooers@ou.edu>
+;; Assisted-by: Claude Code:claude-opus-4-8
+
 ;;; Commentary:
 ;; Unit tests for the pure helper functions of writing-schedule.el.
 ;; Each test exercises one function with a happy path, edge cases, and

@@ -1,5 +1,8 @@
 ;;; test-writing-schedule-integration.el --- Integration tests  -*- lexical-binding: t; -*-
 
+;; Author: Blaine Mooers <blaine-mooers@ou.edu>
+;; Assisted-by: Claude Code:claude-opus-4-8
+
 ;;; Commentary:
 ;; Integration tests for writing-schedule.el.  These exercise the real
 ;; interaction paths: parsing a live org buffer, running the interactive
