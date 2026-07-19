@@ -1,9 +1,27 @@
-;;; writing-schedule.el --- Generate agenda events and iCalendar from a weekly writing-block template -*- lexical-binding: t; -*-
+;;; writing-schedule.el --- Generate a weekly writing schedule and export to iCalendar -*- lexical-binding: t; -*-
 
 ;; Author: Blaine Mooers <blaine-mooers@ou.edu>
+;; Maintainer: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: calendar, outlines, convenience
+;; URL: https://github.com/MooersLab/writing-schedule
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
+;; This file is not part of GNU Emacs.
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;;
@@ -58,6 +76,14 @@
 (require 'subr-x)
 (require 'cl-lib)
 (require 'seq)
+
+;; `ox-icalendar' is loaded on demand inside the export commands.  Declare
+;; the exporter options we dynamically bind there as special variables, so
+;; the byte-compiler treats the `let' bindings as dynamic configuration
+;; rather than unused lexical variables.
+(defvar org-icalendar-include-todo)
+(defvar org-icalendar-with-timestamps)
+(defvar org-icalendar-store-UID)
 
 ;;;; Customization
 
@@ -365,7 +391,9 @@ letters.  MONDAY-ABS anchors the week.  TITLE names the file."
 
 (defun writing-schedule--summary (events mapping)
   "Return an org Summary section that totals weekly hours per letter.
-The section carries no timestamp, so the iCalendar exporter skips it."
+EVENTS are the parsed time blocks, and MAPPING maps each letter to its
+project description.  The section carries no timestamp, so the iCalendar
+exporter skips it."
   (let ((totals (make-hash-table :test #'equal))
         (order '()))
     (dolist (ev events)
@@ -570,7 +598,7 @@ the weeks from most to least recent."
     (sort weeks (lambda (a b) (string> (car a) (car b))))))
 
 (defun writing-schedule--ordered-table (candidates)
-  "Return a completion table over CANDIDATES that keeps their order.
+  "Return a completion table over CANDIDATES that keep their order.
 Without this, most completion interfaces would re-sort the weeks and
 lose the newest-first ordering."
   (lambda (string pred action)
@@ -729,7 +757,7 @@ so batch generation needs no prompts."
   "Print available templates to standard output, one per line.
 DIRECTORY defaults to the directory returned by
 `writing-schedule--template-directory'.  This is meant to be called from
-a shell through emacs --batch, so that people who do not use Emacs can
+a shell through Emacs --batch, so that people who do not use Emacs can
 still see which schedules are available.  Return the template file names."
   (let* ((dir (expand-file-name (or directory (writing-schedule--template-directory))))
          (files (and (file-directory-p dir)
@@ -747,7 +775,7 @@ WEEK is any date inside the target week as an ISO string, and it snaps
 to the Monday.  OUT-DIR, when given, overrides `writing-schedule-directory'.
 Letters are mapped to projects from the table's legend rows, so no
 prompts are needed.  Print the paths written and return the .ics path.
-Meant to be called from a shell through emacs --batch."
+Meant to be called from a shell through Emacs --batch."
   (require 'ox-icalendar)
   (let ((table (expand-file-name table)))
     (unless (file-readable-p table)
@@ -785,7 +813,7 @@ Meant to be called from a shell through emacs --batch."
   "Write or print a blank template for N projects.
 When FILE is non-empty, write the template there, otherwise print it to
 standard output.  Return the template text or the destination path.
-Meant to be called from a shell through emacs --batch."
+Meant to be called from a shell through Emacs --batch."
   (let ((text (writing-schedule--template-string n)))
     (if (and file (not (string-empty-p file)))
         (let ((dest (expand-file-name file)))
@@ -800,7 +828,7 @@ Meant to be called from a shell through emacs --batch."
 (defun writing-schedule-batch-list-weeks (&optional directory)
   "Print archived weekly files to standard output, newest first.
 DIRECTORY overrides `writing-schedule-directory'.  Return the list of
-file names.  Meant to be called from a shell through emacs --batch."
+file names.  Meant to be called from a shell through Emacs --batch."
   (let* ((writing-schedule-directory
           (if (and directory (not (string-empty-p directory)))
               (expand-file-name directory)
@@ -817,7 +845,7 @@ file names.  Meant to be called from a shell through emacs --batch."
   "Save the table in TABLE-FILE as a template named NAME.
 Write it into the template directory, wrapping it with the file's title
 or NAME, and overwrite silently.  Return the destination path.  Meant to
-be called from a shell through emacs --batch."
+be called from a shell through Emacs --batch."
   (let ((table-file (expand-file-name table-file))
         (name (string-trim name)))
     (unless (file-readable-p table-file)
@@ -968,7 +996,7 @@ covers the whole time range."
           "\\setlength{\\cmidrulewidth}{1pt}\n"))
 
 (defun writing-schedule--timeblock-page (date-str key-str spans lo hi ncols)
-  "Return one page of a sheet for hours LO to HI.
+  "Return one page of a sheet for hours LO to HI over NCOLS day columns.
 DATE-STR heads the page, KEY-STR is the code key, and SPANS draws each
 planned block as an outlined box with heavy rules in the first plan
 column.  A block that reaches the page edge is left open there, so a box
@@ -1214,10 +1242,11 @@ them.  Meant to be called from a shell through emacs --batch."
     (define-key map "a" #'writing-schedule-add-to-agenda)
     map)
   "Keymap of writing-schedule commands.
-Bind it to a prefix of your choice.  For example, when C-c w is your
-writing prefix, the following places the commands under C-c w c:
+Bind it to a prefix of your choice.  For example, if `my-writing-prefix'
+is your own writing prefix keymap, the following places the commands
+under its \"c\" key:
 
-  (keymap-set my-writing-prefix \"c\" writing-schedule-command-map)
+  (define-key my-writing-prefix \"c\" writing-schedule-command-map)
 
 The keys are g generate, t template, n new week from template,
 f generate from a saved table, s save table as template, b time-block
