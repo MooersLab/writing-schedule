@@ -135,7 +135,7 @@ Place `writing-schedule.el` on your load path and require it.
 
 The template and table directories default to `templates/` and `tables/` under
 `writing-schedule-directory`, computed each time they are used, so setting the
-base directory is enough and the load order does not matter. Set
+base directory is enough, and the load order does not matter. Set
 `writing-schedule-template-directory` or `writing-schedule-table-directory` only
 when you want templates or working tables somewhere else.
 
@@ -161,7 +161,7 @@ project.
 
 ### 2. Fill the table
 
-Type a code into each day cell to assign a project or task to that block.
+Type code into each day cell to assign a project or task to that block.
 Leave a cell empty to skip that block on that day. The table looks like
 this once filled.
 
@@ -177,7 +177,7 @@ this once filled.
 ```
 
 Put a short project description in the first column of each legend row,
-after the code and colon, for example a first cell of `A: docking`. That
+after the code and colon, for example, a first cell of `A: docking`. That
 description becomes the event title. The parser tolerates irregular
 spacing and single-digit hours, so `9:15 - 10:45`, `04:00-5:30`, and even
 `15:00-16: 30` all work, and a lower-case cell code is normalized to
@@ -193,13 +193,13 @@ projects and two-letter task codes.
 
 ### 3. Generate the schedule
 
-Put point anywhere inside the table and run:
+Put the point (cursor) anywhere inside the table and run:
 
 ```
 M-x writing-schedule-generate
 ```
 
-For each letter you are asked for a project code and a description. If
+For each letter, you are asked for a project code and a description. If
 you typed a description into a legend row, it becomes the default. Then
 you pick any day inside the target week, and the command snaps back to
 that week's Monday. The command writes a dated file for that week, such as
@@ -211,7 +211,7 @@ rather than overwritten.
 ![The prompts writing-schedule-generate asks, with sample responses](imgs/writing-schedule-prompts.png)
 
 *The prompt sequence, with sample responses. The description default
-comes from the legend row, and the agenda step is automatic, because it
+comes from the legend row, and the agenda step is automatic because it
 is controlled by `writing-schedule-add-to-agenda` rather than a prompt.*
 
 ### 4. Sync a calendar
@@ -220,7 +220,7 @@ Run `M-x writing-schedule-export-ics`, or from the shell
 `writing-schedule.sh export`, to write the `.ics` file, then import it
 into any calendar application. Because each headline carries a stable
 identifier, importing an edited week updates the matching events rather
-than duplicating them. The steps for the three common calendars follow.
+than duplicating them. The steps for the three common calendars are as follows.
 
 **Apple Calendar (macOS or iOS).** Choose **File > Import...**, select the
 `.ics` file, then pick a calendar.
@@ -441,7 +441,7 @@ while you are developing the package.
 ```
 
 Managed by straight from a published repository. Drop `:load-path` and
-give straight a git recipe (adjust the host and repo to yours).
+give straight the git recipe.
 
 ```elisp
 (use-package writing-schedule
