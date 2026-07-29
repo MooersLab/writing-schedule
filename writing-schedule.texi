@@ -155,6 +155,16 @@ optionally adds it to @code{org-agenda-files}, and offers to export an
 iCalendar file.
 @end deffn
 
+@deffn Command writing-schedule-generate-for-day
+Parse the schedule table at point and write a single day's schedule.
+Prompt for the day, which defaults to today, and for a project code and
+description for each letter used that day. The dated schedule is written
+to @file{day-<ISO>.org} in @code{writing-schedule-directory}, so a day you
+edit in the weekly table becomes its own schedule and calendar without
+disturbing the weekly archive. Use this when events crop up and you need a
+fresh plan for one day.
+@end deffn
+
 @deffn Command writing-schedule-export-ics &optional file
 Export @var{file}, or the current week's dated file when @var{file} is
 omitted, to an iCalendar file through org's @code{ox-icalendar} back-end.
@@ -213,6 +223,16 @@ you can edit it and export the week to HTML or other formats. PDFs
 compile when a LaTeX compiler is available.
 @end deffn
 
+@deffn Command writing-schedule-timeblock-sheet-for-day
+Generate a printable time-block sheet for a single day from the table at
+point. Choose the output, then enter a date or accept the default of
+today. The sheet covers that day alone and is named @file{sheet-<ISO>.tex}
+and @file{sheet-<ISO>.org} in the sheets directory, so you reprint just
+the day that changed after you edit that day's cells in the weekly table.
+A day the table has no column for prints as a blank sheet. PDFs compile
+when a LaTeX compiler is available.
+@end deffn
+
 @deffn Command writing-schedule-save-template-table &optional name
 Save the org table at point as a template named NAME in the template
 directory, so a table you have customized for a particular kind of week
@@ -234,6 +254,13 @@ generated week is archived here under its own file.
 The format of a weekly file name. The @samp{%s} is replaced by the
 Monday of the week in ISO form, giving a file such as
 @file{writing-2026-01-19.org}. The default is @code{"writing-%s.org"}.
+@end defvr
+
+@defvr {User Option} writing-schedule-day-file-format
+The format of a single-day file name. The @samp{%s} is replaced by the
+day in ISO form, giving a file such as @file{day-2026-01-21.org}. The
+@samp{day-} prefix keeps these files out of the weekly archive, which
+lists only the @samp{writing-} files. The default is @code{"day-%s.org"}.
 @end defvr
 
 @defvr {User Option} writing-schedule-template-directory
@@ -408,6 +435,25 @@ Write printable time-block sheets from @var{table} for @var{week}.
 Non-nil PER-DAY writes one PDF per day, else one for the week.
 @var{out-dir} overrides the sheets directory. @var{format} is the string
 @samp{pdf}, @samp{org}, or @samp{both}, and defaults to both.
+@end deffn
+
+@deffn Command writing-schedule-batch-generate-day table day &optional out-dir
+Generate a single day's schedule and iCalendar file from @var{table} for
+@var{day}. @var{day} is an ISO date string, or the word @samp{today}, or
+an empty string, which both mean today. @var{out-dir} overrides
+@code{writing-schedule-directory}. Letters are mapped from the table
+legend, so no prompts are needed. The schedule is written to
+@file{day-<ISO>.org}. Print the paths written and return the @file{.ics}
+path.
+@end deffn
+
+@deffn Command writing-schedule-batch-timeblock-sheet-day table day &optional out-dir format
+Write a single-day time-block sheet from @var{table} for @var{day}.
+@var{day} is an ISO date string, or the word @samp{today}, or an empty
+string, which both mean today. @var{out-dir} overrides the sheets
+directory. @var{format} is the string @samp{pdf}, @samp{org}, or
+@samp{both}, and defaults to both. The sheet is named
+@file{sheet-<ISO>.tex} and @file{sheet-<ISO>.org}.
 @end deffn
 
 @node Testing

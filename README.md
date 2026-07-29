@@ -214,6 +214,13 @@ rather than overwritten.
 comes from the legend row, and the agenda step is automatic, because it
 is controlled by `writing-schedule-add-to-agenda` rather than a prompt.*
 
+When events crop up and a single day changes, edit that day's cells in the
+table and run `M-x writing-schedule-generate-for-day` instead. It prompts
+for the day, which defaults to today, then writes the schedule and calendar
+for that day alone as `day-<ISO>.org` in `writing-schedule-directory`. The
+`day-` prefix keeps it out of the weekly archive, so redoing a day never
+overwrites the week it belongs to.
+
 ### 4. Sync a calendar
 
 Run `M-x writing-schedule-export-ics`, or from the shell
@@ -333,6 +340,19 @@ sheets are written to a `sheets/` subdirectory and compiled when
 compile. The hours, the number of columns, and the sheet directory are
 all customizable.
 
+When events crop up and you need a fresh sheet for one day rather than
+the whole week, edit that day's cells in the table and run:
+
+```
+M-x writing-schedule-timeblock-sheet-for-day
+```
+
+Choose the output, then enter a date or accept the default of today. This
+writes `sheet-<ISO>.tex` and `sheet-<ISO>.org` for that day alone into the
+same `sheets/` subdirectory, so you reprint just the day that changed. A
+day the table has no column for prints as a blank sheet, which is handy
+when today is not a planned day.
+
 You can also customize the code descriptions shown in the key. A table
 carries its own legend rows, and those always win because they are
 specific to that week. For codes a table does not describe, the key falls
@@ -368,6 +388,7 @@ so all three become sources of TODO items and timed blocks.
 |------------------------------------|--------------------------------------------------|
 | `writing-schedule-insert-template` | Insert a blank table for up to 26 projects        |
 | `writing-schedule-generate`        | Parse the table at point and write the org file  |
+| `writing-schedule-generate-for-day` | Write the schedule and calendar for one day, or today, as `day-<ISO>.org` |
 | `writing-schedule-export-ics`      | Export the org file to an `.ics` file            |
 | `writing-schedule-add-to-agenda`   | Add the generated file to `org-agenda-files`     |
 | `writing-schedule-open-week`       | Open an archived week by completion, newest first, or by date with a prefix argument |
@@ -376,16 +397,17 @@ so all three become sources of TODO items and timed blocks.
 | `writing-schedule-generate-from-template` | Select a saved table and generate the schedule from it directly |
 | `writing-schedule-save-template-table`          | Save the edited table at point as a named template |
 | `writing-schedule-timeblock-sheets`             | Print two-page time-block sheets for the week      |
+| `writing-schedule-timeblock-sheet-for-day`      | Print a two-page time-block sheet for one day, or today |
 
 ## Key bindings
 
 The package ships a prefix keymap, `writing-schedule-command-map`, that
-puts the commands on single keys: `g` generate, `t` template, `n` new
-week from template, `f` generate from a saved table, `s` save table as template, `b`
-time-block sheets, `o` open
-week, `r` open recent, `e` export ics, and `a` add to agenda. Bind it
-under any prefix you like. When `C-c w` is already your writing prefix,
-nest it on a free key such as `c`.
+puts the commands on single keys: `g` generate, `G` generate one day, `t`
+template, `n` new week from template, `f` generate from a saved table, `s`
+save table as template, `b` time-block sheets, `d` time-block sheet for one
+day, `o` open week, `r` open recent, `e` export ics, and `a` add to
+agenda. Bind it under any prefix you like. When `C-c w` is already your
+writing prefix, nest it on a free key such as `c`.
 
 ```elisp
 (with-eval-after-load 'writing-schedule
@@ -404,11 +426,13 @@ adds which-key labels.
     (which-key-add-key-based-replacements
       "C-c w c"   "writing-schedule"
       "C-c w c g" "generate week"
+      "C-c w c G" "generate one day"
       "C-c w c t" "insert template"
       "C-c w c n" "new week from template"
       "C-c w c f" "generate from table"
       "C-c w c s" "save table as template"
       "C-c w c b" "time-block sheets"
+      "C-c w c d" "sheet for one day"
       "C-c w c o" "open week"
       "C-c w c r" "open recent"
       "C-c w c e" "export ics"
@@ -532,8 +556,10 @@ The commands are:
 ./writing-schedule.sh template 4                 # print a blank 4-project template
 ./writing-schedule.sh template 4 heavy.org       # or write it to a file
 ./writing-schedule.sh generate three-projects 2026-01-21   # table + date -> schedule + .ics
+./writing-schedule.sh generate-day three-projects today    # one day's schedule + .ics (a date or "today")
 ./writing-schedule.sh export writing-2026-01-19.org        # re-export a schedule to .ics
 ./writing-schedule.sh sheets three-projects 2026-01-21     # week PDF sheets and an editable org file (add --per-day)
+./writing-schedule.sh sheet three-projects today           # one day's sheet (a date or "today"); add pdf, org, or both
 ./writing-schedule.sh save heavy.org grant-week  # save a table file into the library
 ./writing-schedule.sh deps                       # check that Emacs is available
 ./writing-schedule.sh help

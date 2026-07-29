@@ -512,6 +512,99 @@ and are used verbatim when set, at call time and in any load order."
     (should (string-match-p "| Time | Code | Task | Revision |" org))
     (should (string-match-p "| 4:00-5:30 | A | docking | |" org))))
 
+(ert-deftest writing-schedule/timeblock/org-document-single-day ()
+  "With an offset, the org export covers only that one day."
+  (let* ((table '(("Time <l>" "M" "Tu")
+                  hline
+                  ("04:00-05:30" "A" "EM")
+                  hline
+                  ("A: docking" "" "")
+                  ("EM: email" "" "")))
+         (parsed (writing-schedule--parse table))
+         (monday (calendar-absolute-from-gregorian '(1 19 2026)))
+         (org (writing-schedule--timeblock-org-document parsed monday 1)))
+    (should (string-match-p "#\\+TITLE: Time-Block Sheet, 2026-01-20" org))
+    (should (string-match-p "^\\* 2026-01-20 (Tuesday)" org))
+    (should-not (string-match-p "2026-01-19 (Monday)" org))
+    (should (string-match-p "| 4:00-5:30 | EM | email | |" org))))
+
+(ert-deftest writing-schedule/timeblock/latex-single-day ()
+  "With an offset, the LaTeX sheet covers only that one day."
+  (let* ((table '(("Time <l>" "M" "Tu")
+                  hline
+                  ("Gen:" "" "")
+                  ("04:00-05:30" "A" "EM")
+                  hline
+                  ("A: docking" "" "")
+                  ("EM: email" "" "")))
+         (parsed (writing-schedule--parse table))
+         (monday (calendar-absolute-from-gregorian '(1 19 2026)))
+         (kd (writing-schedule--timeblock-days parsed monday 1))
+         (doc (writing-schedule--timeblock-document (car kd) (cdr kd))))
+    (should (= (length (cdr kd)) 1))
+    (should (string-match-p "Date: 2026-01-20 (Tuesday)" doc))
+    (should-not (string-match-p "Date: 2026-01-19 (Monday)" doc))))
+
+(ert-deftest writing-schedule/timeblock/days-blank-for-absent-day ()
+  "An offset with no column still returns one day, with no blocks."
+  (let* ((table '(("Time <l>" "M")
+                  hline
+                  ("04:00-05:30" "A")))
+         (parsed (writing-schedule--parse table))
+         (monday (calendar-absolute-from-gregorian '(1 19 2026)))
+         (kd (writing-schedule--timeblock-days parsed monday 6))) ; Sunday
+    (should (= (length (cdr kd)) 1))
+    (should (string-match-p "2026-01-25 (Sunday)" (car (car (cdr kd)))))
+    (should (null (cdr (car (cdr kd)))))))
+
+;;;; writing-schedule day-abs and monday-of-abs
+
+(ert-deftest writing-schedule/day-abs/today-and-iso ()
+  "A day spec resolves an ISO date, and today from nil, the empty string, or the word."
+  (should (= (writing-schedule--day-abs "2026-01-20")
+             (calendar-absolute-from-gregorian '(1 20 2026))))
+  (let ((today (writing-schedule--abs-from-time (current-time))))
+    (should (= (writing-schedule--day-abs nil) today))
+    (should (= (writing-schedule--day-abs "") today))
+    (should (= (writing-schedule--day-abs "  Today ") today))))
+
+(ert-deftest writing-schedule/monday-of-abs/snaps-any-day ()
+  "Any day in a week maps to that week's Monday."
+  (let ((monday (calendar-absolute-from-gregorian '(1 19 2026))))
+    (dolist (greg '((1 19 2026) (1 20 2026) (1 24 2026) (1 25 2026)))
+      (should (= (writing-schedule--monday-of-abs
+                  (calendar-absolute-from-gregorian greg))
+                 monday)))))
+
+;;;; writing-schedule single-day schedule
+
+(ert-deftest writing-schedule/day-title/formats-date-and-weekday ()
+  "A single-day title carries the ISO date and the weekday name."
+  (should (string= (writing-schedule--day-title
+                    (calendar-absolute-from-gregorian '(1 21 2026)))
+                   "Writing Schedule (2026-01-21 Wednesday)")))
+
+(ert-deftest writing-schedule/day-events/filters-to-one-day ()
+  "Only the events whose offset falls on the day survive."
+  (let* ((events (list (list :section "Gen" :offset 0
+                             :start "04:00" :end "05:30" :letter "A")
+                       (list :section "Gen" :offset 2
+                             :start "09:00" :end "10:30" :letter "B")))
+         (monday (calendar-absolute-from-gregorian '(1 19 2026)))
+         (wed (calendar-absolute-from-gregorian '(1 21 2026)))
+         (filtered (writing-schedule--day-events events monday wed)))
+    (should (= (length filtered) 1))
+    (should (equal (plist-get (car filtered) :letter) "B"))
+    (should (equal (writing-schedule--day-letters filtered) '("B")))))
+
+(ert-deftest writing-schedule/day-file-for-day/builds-day-name ()
+  "The single-day file uses the day- prefix and the ISO date."
+  (let ((writing-schedule-directory "/tmp/base")
+        (writing-schedule-day-file-format "day-%s.org"))
+    (should (string= (writing-schedule-day-file-for-day
+                      (calendar-absolute-from-gregorian '(1 21 2026)))
+                     "/tmp/base/day-2026-01-21.org"))))
+
 ;;;; writing-schedule--legend-mapping
 
 (ert-deftest writing-schedule/legend-mapping/uses-legend-descriptions ()
@@ -529,10 +622,13 @@ and are used verbatim when set, at call time and in any load order."
   "The command map is a keymap that binds each key to its command."
   (should (keymapp writing-schedule-command-map))
   (dolist (pair '(("g" . writing-schedule-generate)
+                  ("G" . writing-schedule-generate-for-day)
                   ("t" . writing-schedule-insert-template)
                   ("n" . writing-schedule-new-week-from-template)
                   ("f" . writing-schedule-generate-from-template)
                   ("s" . writing-schedule-save-template-table)
+                  ("b" . writing-schedule-timeblock-sheets)
+                  ("d" . writing-schedule-timeblock-sheet-for-day)
                   ("o" . writing-schedule-open-week)
                   ("r" . writing-schedule-open-recent)
                   ("e" . writing-schedule-export-ics)

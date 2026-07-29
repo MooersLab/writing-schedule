@@ -54,7 +54,9 @@
 ;;   `writing-schedule-insert-template'         insert a blank table for 1 to 26 projects
 ;;   `writing-schedule-new-week-from-template'  start this week from a saved template
 ;;   `writing-schedule-generate'                parse the table at point and write the org file
+;;   `writing-schedule-generate-for-day'        write the schedule and calendar for one day, or today
 ;;   `writing-schedule-timeblock-sheets'        print time-block sheets for the week
+;;   `writing-schedule-timeblock-sheet-for-day' print a time-block sheet for one day, or today
 ;;   `writing-schedule-open-week'               open an archived week, by completion or by date
 ;;   `writing-schedule-open-recent'             open the most recent archived week
 ;;   `writing-schedule-export-ics'              export the org file to .ics
@@ -106,6 +108,14 @@ weeks are kept rather than overwritten."
   "Format of a weekly schedule file name.
 The %s is replaced by the Monday of the week in ISO form, for
 example 2026-01-19, giving a file such as writing-2026-01-19.org."
+  :type 'string)
+
+(defcustom writing-schedule-day-file-format "day-%s.org"
+  "Format of a single-day schedule file name.
+The %s is replaced by the day in ISO form, for example 2026-01-21,
+giving a file such as day-2026-01-21.org.  The day- prefix keeps these
+single-day files out of the weekly archive, which lists only the
+writing- files, so a reprinted day never shadows the week it belongs to."
   :type 'string)
 
 (defcustom writing-schedule-template-directory nil
@@ -261,13 +271,36 @@ and :letter."
 
 ;;;; Date helpers
 
-(defun writing-schedule--week-monday (time)
-  "Return the absolute calendar date of the Monday on or before TIME."
+(defun writing-schedule--abs-from-time (time)
+  "Return the absolute calendar date for TIME."
   (let* ((decoded (decode-time time))
-         (greg (list (nth 4 decoded) (nth 3 decoded) (nth 5 decoded)))
-         (abs (calendar-absolute-from-gregorian greg))
+         (greg (list (nth 4 decoded) (nth 3 decoded) (nth 5 decoded))))
+    (calendar-absolute-from-gregorian greg)))
+
+(defun writing-schedule--monday-of-abs (abs)
+  "Return the absolute date of the Monday on or before ABS."
+  (let* ((greg (calendar-gregorian-from-absolute abs))
          (dow (calendar-day-of-week greg))) ; 0 is Sunday, 6 is Saturday
     (- abs (if (= dow 0) 6 (1- dow)))))
+
+(defun writing-schedule--week-monday (time)
+  "Return the absolute calendar date of the Monday on or before TIME."
+  (writing-schedule--monday-of-abs (writing-schedule--abs-from-time time)))
+
+(defun writing-schedule--day-abs (spec)
+  "Return the absolute calendar date named by SPEC.
+SPEC is an ISO date string, the word \"today\", or nil or the empty
+string, which both mean today.  Leading and trailing space is tolerated,
+and the match on \"today\" ignores case.  This is what the day-scoped
+sheet commands accept, so a caller can name a specific day or ask for
+today."
+  (writing-schedule--abs-from-time
+   (if (or (null spec)
+           (and (stringp spec)
+                (let ((s (downcase (string-trim spec))))
+                  (or (string-empty-p s) (string-equal s "today")))))
+       (current-time)
+     (org-read-date nil t spec))))
 
 (defun writing-schedule--iso-date (abs)
   "Return the ISO date string, such as 2026-01-19, for absolute date ABS."
@@ -280,6 +313,14 @@ The file lives in `writing-schedule-directory' and is named
 according to `writing-schedule-file-format'."
   (expand-file-name (format writing-schedule-file-format
                             (writing-schedule--iso-date monday-abs))
+                    writing-schedule-directory))
+
+(defun writing-schedule-day-file-for-day (day-abs)
+  "Return the schedule file path for the single day DAY-ABS.
+The file lives in `writing-schedule-directory' and is named according to
+`writing-schedule-day-file-format'."
+  (expand-file-name (format writing-schedule-day-file-format
+                            (writing-schedule--iso-date day-abs))
                     writing-schedule-directory))
 
 (defun writing-schedule--current-week-file ()
@@ -497,6 +538,68 @@ the week to schedule."
         (writing-schedule-export-ics file))
       (find-file file)
       (message "Wrote %d events to %s" (length events) file))))
+
+(defun writing-schedule--day-title (day-abs)
+  "Return the single-day schedule title for DAY-ABS."
+  (format "Writing Schedule (%s %s)"
+          (writing-schedule--iso-date day-abs)
+          (calendar-day-name (calendar-gregorian-from-absolute day-abs))))
+
+(defun writing-schedule--day-events (events monday-abs day-abs)
+  "Return the members of EVENTS whose offset falls on DAY-ABS.
+MONDAY-ABS anchors the week, so the offset is DAY-ABS minus MONDAY-ABS."
+  (let ((offset (- day-abs monday-abs)))
+    (seq-filter (lambda (e) (= (plist-get e :offset) offset)) events)))
+
+(defun writing-schedule--day-letters (events)
+  "Return the sorted, de-duplicated letters used by EVENTS."
+  (sort (delete-dups (mapcar (lambda (e) (plist-get e :letter)) events))
+        #'string<))
+
+;;;###autoload
+(defun writing-schedule-generate-for-day ()
+  "Parse the schedule table at point and write a single day's schedule.
+Prompt for the day, which defaults to today, and for a project code and
+description for each letter used that day.  Write the dated schedule to
+day-<ISO>.org in `writing-schedule-directory', so a day you edit in the
+weekly table becomes its own schedule and calendar without disturbing the
+weekly archive.  Use this when events crop up and you need a fresh plan
+for one day."
+  (interactive)
+  (unless (org-at-table-p)
+    (user-error "Point is not in an org table.  Move into your schedule table first"))
+  (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+         (all-events (plist-get parsed :events)))
+    (unless all-events
+      (user-error "No filled time blocks found in this table"))
+    (let* ((day-abs (writing-schedule--abs-from-time
+                     (org-read-date nil t nil
+                                    "Day to schedule (any date, default today): ")))
+           (monday (writing-schedule--monday-of-abs day-abs))
+           (events (writing-schedule--day-events all-events monday day-abs)))
+      (unless events
+        (user-error "No filled time blocks for %s"
+                    (writing-schedule--iso-date day-abs)))
+      (let* ((mapping (writing-schedule--read-mapping
+                       (writing-schedule--day-letters events)
+                       (plist-get parsed :legend)))
+             (title (writing-schedule--day-title day-abs))
+             (body (concat (writing-schedule--build-org events mapping monday title)
+                           (writing-schedule--summary events mapping)))
+             (default-file (writing-schedule-day-file-for-day day-abs))
+             (file (progn
+                     (make-directory (file-name-directory default-file) t)
+                     (read-file-name "Write day schedule to: "
+                                     (file-name-directory default-file)
+                                     default-file nil
+                                     (file-name-nondirectory default-file)))))
+        (with-temp-file file (insert body))
+        (when writing-schedule-add-to-agenda
+          (writing-schedule--ensure-agenda file))
+        (when (y-or-n-p "Export this day to an .ics file now? ")
+          (writing-schedule-export-ics file))
+        (find-file file)
+        (message "Wrote %d events to %s" (length events) file)))))
 
 (defun writing-schedule--blank-row (label nd)
   "Return a table row with LABEL and ND empty day cells."
@@ -810,6 +913,52 @@ Meant to be called from a shell through Emacs --batch."
             ics))))))
 
 ;;;###autoload
+(defun writing-schedule-batch-generate-day (table day &optional out-dir)
+  "Generate a single day's schedule and iCalendar file from TABLE for DAY.
+TABLE is a path to an org file that holds a filled schedule table.  DAY is
+an ISO date string, or the word \"today\", or an empty string, which both
+mean today.  OUT-DIR, when given, overrides `writing-schedule-directory'.
+Letters are mapped to projects from the table's legend rows, so no prompts
+are needed.  The schedule is written to day-<ISO>.org.  Print the paths
+written and return the .ics path.  Meant to be called from a shell through
+Emacs --batch."
+  (require 'ox-icalendar)
+  (let ((table (expand-file-name table)))
+    (unless (file-readable-p table)
+      (error "Cannot read table file: %s" table))
+    (when (and out-dir (not (string-empty-p out-dir)))
+      (setq writing-schedule-directory (expand-file-name out-dir)))
+    (with-temp-buffer
+      (insert-file-contents table)
+      (org-mode)
+      (goto-char (point-min))
+      (unless (re-search-forward "^[ \t]*|" nil t)
+        (error "No org table found in %s" table))
+      (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+             (all-events (plist-get parsed :events)))
+        (unless all-events
+          (error "No filled time blocks found in %s" table))
+        (let* ((day-abs (writing-schedule--day-abs day))
+               (monday (writing-schedule--monday-of-abs day-abs))
+               (events (writing-schedule--day-events all-events monday day-abs)))
+          (unless events
+            (error "No filled time blocks for %s"
+                   (writing-schedule--iso-date day-abs)))
+          (let* ((mapping (writing-schedule--legend-mapping
+                           (writing-schedule--day-letters events)
+                           (plist-get parsed :legend)))
+                 (title (writing-schedule--day-title day-abs))
+                 (body (concat (writing-schedule--build-org events mapping monday title)
+                               (writing-schedule--summary events mapping)))
+                 (org-file (writing-schedule-day-file-for-day day-abs)))
+            (make-directory (file-name-directory org-file) t)
+            (with-temp-file org-file (insert body))
+            (let ((ics (writing-schedule-export-ics org-file)))
+              (princ (format "Wrote schedule:  %s\n" org-file))
+              (princ (format "Wrote iCalendar: %s\n" ics))
+              ics)))))))
+
+;;;###autoload
 (defun writing-schedule-batch-insert-template (n &optional file)
   "Write or print a blank template for N projects.
 When FILE is non-empty, write the template there, otherwise print it to
@@ -1059,15 +1208,20 @@ DAYS is a list of (DATE-STR . SPANS)."
                      days "\n\\clearpage\n")
           "\n\\end{document}\n"))
 
-(defun writing-schedule--timeblock-days (parsed monday-abs)
+(defun writing-schedule--timeblock-days (parsed monday-abs &optional only-off)
   "Return (KEY-STR . DAYS) for PARSED starting at MONDAY-ABS.
-DAYS is a list of (DATE-STR . CELLS), one per day column in the table."
+DAYS is a list of (DATE-STR . CELLS), one per day column in the table.
+When ONLY-OFF is a Monday offset, return just that one day, even when
+the table has no column for it, in which case the day carries no blocks
+and reads as a blank sheet."
   (let* ((events (plist-get parsed :events))
          (columns (plist-get parsed :columns))
          (key (writing-schedule--timeblock-key
                (plist-get parsed :letters)
                (writing-schedule--effective-legend (plist-get parsed :legend))))
-         (offsets (sort (delete-dups (mapcar #'cdr columns)) #'<))
+         (offsets (if only-off
+                      (list only-off)
+                    (sort (delete-dups (mapcar #'cdr columns)) #'<)))
          (days '()))
     (dolist (off offsets)
       (let* ((day-events (seq-filter (lambda (e) (= (plist-get e :offset) off)) events))
@@ -1078,19 +1232,26 @@ DAYS is a list of (DATE-STR . CELLS), one per day column in the table."
         (push (cons date-str (writing-schedule--timeblock-spans day-events)) days)))
     (cons key (nreverse days))))
 
-(defun writing-schedule--timeblock-org-document (parsed monday)
+(defun writing-schedule--timeblock-org-document (parsed monday &optional only-off)
   "Return an editable org document of the week's blocks for PARSED and MONDAY.
 Each day is a section with a table of Time, Code, Task, and a blank
 Revision column, so you can edit the events and export the schedule to
-HTML or other formats."
+HTML or other formats.  When ONLY-OFF is a Monday offset, the document
+covers only that one day, so you can edit and print the plan for a
+single day."
   (let* ((events (plist-get parsed :events))
          (columns (plist-get parsed :columns))
          (letters (plist-get parsed :letters))
          (legend (writing-schedule--effective-legend (plist-get parsed :legend)))
-         (offsets (sort (delete-dups (mapcar #'cdr columns)) #'<)))
+         (offsets (if only-off
+                      (list only-off)
+                    (sort (delete-dups (mapcar #'cdr columns)) #'<))))
     (concat
-     (format "#+TITLE: Time-Block Sheets, week of %s\n"
-             (writing-schedule--iso-date monday))
+     (if only-off
+         (format "#+TITLE: Time-Block Sheet, %s\n"
+                 (writing-schedule--iso-date (+ monday only-off)))
+       (format "#+TITLE: Time-Block Sheets, week of %s\n"
+               (writing-schedule--iso-date monday)))
      "#+LaTeX_HEADER: \\usepackage[margin=0.5in]{geometry}\n"
      "#+OPTIONS: toc:nil\n\n"
      "* Key\n"
@@ -1141,35 +1302,51 @@ Return TEX-FILE."
                       "-halt-on-error" (file-name-nondirectory tex-file)))))
   tex-file)
 
-(defun writing-schedule--timeblock-generate (parsed monday per-day dir format)
+(defun writing-schedule--timeblock-generate (parsed monday per-day dir format &optional day-abs)
   "Write time-block sheets for PARSED and MONDAY into DIR.
 PER-DAY writes one PDF per day, else one PDF for the week.  FORMAT is one
-of the symbols pdf, org, or both.  The org file is always a single week
-file.  Return the list of files written."
+of the symbols pdf, org, or both.  When DAY-ABS is an absolute date,
+write a single-day sheet named sheet-<ISO>.tex and sheet-<ISO>.org for
+that day, ignoring PER-DAY, which is how the day-scoped commands print
+the plan for a single day.  Otherwise the org file is a single week file.
+Return the list of files written."
   (let ((written '())
-        (stamp (writing-schedule--iso-date monday)))
+        (stamp (writing-schedule--iso-date monday))
+        (only-off (and day-abs (- day-abs monday))))
     (unless (delete-dups (mapcar #'cdr (plist-get parsed :columns)))
       (error "No day columns found in the table"))
     (make-directory dir t)
     (when (memq format '(pdf both))
-      (let* ((kd (writing-schedule--timeblock-days parsed monday))
+      (let* ((kd (writing-schedule--timeblock-days parsed monday only-off))
              (key (car kd))
              (days (cdr kd)))
-        (if per-day
-            (dolist (day days)
-              (let* ((date (car (split-string (car day) " ")))
-                     (tex (expand-file-name (format "sheet-%s.tex" date) dir)))
-                (writing-schedule--write-and-compile
-                 tex (writing-schedule--timeblock-document key (list day)))
-                (push tex written)))
+        (cond
+         (day-abs
+          (let ((tex (expand-file-name
+                      (format "sheet-%s.tex" (writing-schedule--iso-date day-abs)) dir)))
+            (writing-schedule--write-and-compile
+             tex (writing-schedule--timeblock-document key days))
+            (push tex written)))
+         (per-day
+          (dolist (day days)
+            (let* ((date (car (split-string (car day) " ")))
+                   (tex (expand-file-name (format "sheet-%s.tex" date) dir)))
+              (writing-schedule--write-and-compile
+               tex (writing-schedule--timeblock-document key (list day)))
+              (push tex written))))
+         (t
           (let ((tex (expand-file-name (format "sheets-week-%s.tex" stamp) dir)))
             (writing-schedule--write-and-compile
              tex (writing-schedule--timeblock-document key days))
-            (push tex written)))))
+            (push tex written))))))
     (when (memq format '(org both))
-      (let ((org (expand-file-name (format "sheets-week-%s.org" stamp) dir)))
+      (let ((org (expand-file-name
+                  (if day-abs
+                      (format "sheet-%s.org" (writing-schedule--iso-date day-abs))
+                    (format "sheets-week-%s.org" stamp))
+                  dir)))
         (with-temp-file org
-          (insert (writing-schedule--timeblock-org-document parsed monday)))
+          (insert (writing-schedule--timeblock-org-document parsed monday only-off)))
         (push org written)))
     (nreverse written)))
 
@@ -1194,6 +1371,32 @@ when a LaTeX compiler is available."
                   (org-read-date nil t nil "Week for the sheets (any day in it): ")))
          (files (writing-schedule--timeblock-generate
                  parsed monday per-day (writing-schedule--sheets-directory) format)))
+    (message "Wrote %d sheet file%s to %s" (length files)
+             (if (= (length files) 1) "" "s") (writing-schedule--sheets-directory))
+    files))
+
+;;;###autoload
+(defun writing-schedule-timeblock-sheet-for-day ()
+  "Generate a printable time-block sheet for a single day.
+Prompt for the day, which defaults to today, and for the output format,
+then write a two-page sheet for that day alone.  Use this when events
+crop up, you edit that day's cells in the weekly table, and you need a
+fresh sheet for just that day.  The sheet is named sheet-<ISO>.tex or
+sheet-<ISO>.org and lands in the sheets directory.  A day the table has
+no column for prints as a blank sheet.  PDFs compile when a LaTeX
+compiler is available."
+  (interactive)
+  (unless (org-at-table-p)
+    (user-error "Point is not in an org table.  Move into your schedule table first"))
+  (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+         (format (intern (completing-read "Output (pdf, org, both): "
+                                          '("pdf" "org" "both") nil t nil nil "both")))
+         (day-abs (writing-schedule--abs-from-time
+                   (org-read-date nil t nil
+                                  "Day for the sheet (any date, default today): ")))
+         (monday (writing-schedule--monday-of-abs day-abs))
+         (files (writing-schedule--timeblock-generate
+                 parsed monday nil (writing-schedule--sheets-directory) format day-abs)))
     (message "Wrote %d sheet file%s to %s" (length files)
              (if (= (length files) 1) "" "s") (writing-schedule--sheets-directory))
     files))
@@ -1226,17 +1429,50 @@ them.  Meant to be called from a shell through emacs --batch."
         (dolist (f files) (princ (format "Wrote %s\n" f)))
         files))))
 
+;;;###autoload
+(defun writing-schedule-batch-timeblock-sheet-day (table day &optional out-dir format)
+  "Generate a single-day time-block sheet from TABLE for DAY.
+DAY is an ISO date string, or the word \"today\", or an empty string,
+which both mean today.  OUT-DIR overrides the sheets directory.  FORMAT
+is the string \"pdf\", \"org\", or \"both\", and defaults to both.  The
+sheet is named sheet-<ISO>.tex and sheet-<ISO>.org.  Print the files
+written and return them.  Meant to be called from a shell through emacs
+--batch."
+  (let ((table (expand-file-name table)))
+    (unless (file-readable-p table)
+      (error "Cannot read table file: %s" table))
+    (with-temp-buffer
+      (insert-file-contents table)
+      (org-mode)
+      (goto-char (point-min))
+      (unless (re-search-forward "^[ \t]*|" nil t)
+        (error "No org table found in %s" table))
+      (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+             (day-abs (writing-schedule--day-abs day))
+             (monday (writing-schedule--monday-of-abs day-abs))
+             (dir (if (and out-dir (not (string-empty-p out-dir)))
+                      (expand-file-name out-dir)
+                    (writing-schedule--sheets-directory)))
+             (fmt (if (and format (not (string-empty-p format)))
+                      (intern format)
+                    'both))
+             (files (writing-schedule--timeblock-generate parsed monday nil dir fmt day-abs)))
+        (dolist (f files) (princ (format "Wrote %s\n" f)))
+        files))))
+
 ;;;; Suggested key map
 
 ;;;###autoload (autoload 'writing-schedule-command-map "writing-schedule" nil t 'keymap)
 (defvar writing-schedule-command-map
   (let ((map (make-sparse-keymap)))
     (define-key map "g" #'writing-schedule-generate)
+    (define-key map "G" #'writing-schedule-generate-for-day)
     (define-key map "t" #'writing-schedule-insert-template)
     (define-key map "n" #'writing-schedule-new-week-from-template)
     (define-key map "f" #'writing-schedule-generate-from-template)
     (define-key map "s" #'writing-schedule-save-template-table)
     (define-key map "b" #'writing-schedule-timeblock-sheets)
+    (define-key map "d" #'writing-schedule-timeblock-sheet-for-day)
     (define-key map "o" #'writing-schedule-open-week)
     (define-key map "r" #'writing-schedule-open-recent)
     (define-key map "e" #'writing-schedule-export-ics)
@@ -1249,9 +1485,10 @@ under its \"c\" key:
 
   (define-key my-writing-prefix \"c\" writing-schedule-command-map)
 
-The keys are g generate, t template, n new week from template,
-f generate from a saved table, s save table as template, b time-block
-sheets, o open week, r open recent, e export ics, and a add to agenda.")
+The keys are g generate, G generate one day, t template, n new week from
+template, f generate from a saved table, s save table as template,
+b time-block sheets, d time-block sheet for one day, o open week,
+r open recent, e export ics, and a add to agenda.")
 
 (provide 'writing-schedule)
 ;;; writing-schedule.el ends here

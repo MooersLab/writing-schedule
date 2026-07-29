@@ -1,0 +1,473 @@
+#+TITLE: Writing Schedule Format Specification
+#+SUBTITLE: A reference for any implementation, version 1.0
+#+OPTIONS: toc:2 num:t
+#+STARTUP: noindent overview
+#+LaTeX_HEADER: \usepackage[margin=0.5in]{geometry}
+#+LaTeX_HEADER: \usepackage{booktabs}
+
+* Purpose and status
+
+This document specifies the file formats and behaviors of the writing
+schedule system, independent of any one implementation. It exists so that
+a second implementation, for example one written in Python, can match the
+reference implementation in =writing-schedule.el= without reading elisp.
+
+Everything here was derived from the reference implementation and
+verified against generated output. Where the reference behavior is an
+accident of its host environment rather than a deliberate choice, the
+text says so, because a second implementation may reasonably improve on
+it.
+
+Two conformance levels are used. A *required* behavior must match, or the
+two implementations will disagree on a user's files. A *recommended*
+behavior is expected but may be improved deliberately.
+
+* The weekly block table
+
+** Overall shape
+
+The input is an org table. The first column is a label column. Every
+other column may be a day column. Rows carry four different meanings, and
+the parser decides which meaning applies by testing the first cell of the
+row. Horizontal rules are ignored everywhere.
+
+The four row kinds are the header row, the legend row, the time-block
+row, and the section header row. They are tested in that order, and the
+first test that matches wins. This order is required, because a label
+such as =A: docking= would otherwise also satisfy the section header
+pattern.
+
+** Row kind one, the header row
+
+The header row is the first row in which any cell after the first names a
+weekday. Naming a weekday means the trimmed, lower-cased cell text
+appears in the day table below. Every cell after the first that names a
+day becomes a day column, recorded as a pair of the column index and an
+offset in days from Monday.
+
+Only the first such row is used. Later rows that happen to name days are
+treated as ordinary rows.
+
+#+CAPTION: Accepted day abbreviations and their offsets from Monday.
+#+ATTR_LATEX: :booktabs t
+#+NAME: tab:days
+| Offset | Accepted spellings  |
+|--------+---------------------|
+|      0 | m, mo, mon          |
+|      1 | tu, tue             |
+|      2 | w, we, wed          |
+|      3 | th, thu             |
+|      4 | f, fr, fri          |
+|      5 | sa, sat             |
+|      6 | su, sun             |
+
+Matching is case-insensitive and ignores surrounding whitespace. Longer
+spellings such as =monday= are *not* accepted. A second implementation
+that wishes to accept them should treat the list above as a required
+minimum rather than a maximum, because accepting more spellings cannot
+break an existing table.
+
+Day columns need not be contiguous, need not be in order, and need not
+cover all seven days. A table with only Monday and Thursday columns is
+valid.
+
+** Row kind two, the legend row
+
+A legend row maps a code to a description. The first cell must match this
+pattern, tested case-sensitively:
+
+: ^([A-Z][A-Z0-9]{0,3})[ \t]*:(.*)$
+
+The captured code is one uppercase letter followed by up to three more
+uppercase letters or digits, so codes are one to four characters. The
+description is whatever follows the colon.
+
+The case-sensitive test is *required*, and it is the single most
+important rule in the grammar. It is what separates a code from a section
+header, because =A: docking= is a legend row while =Generative:= is a
+section header. An implementation that lower-cases the label before
+testing will misread every section header as a legend row.
+
+When the text after the colon is empty, the description is taken instead
+from the remaining cells of that row, joined with single spaces and
+trimmed. This allows a two-column legend layout in which the code sits in
+the first column and the description sits in the second.
+
+Codes are stored upper-cased. When a code appears in more than one legend
+row, an implementation may keep either entry, because the reference
+implementation's behavior here is incidental rather than designed.
+
+** Row kind three, the time-block row
+
+A row is a time-block row when day columns have already been found and
+the first cell contains a time range. For each day column, a non-empty
+cell produces one event. The cell text is upper-cased and becomes the
+event code.
+
+An event carries five fields.
+
+#+CAPTION: Fields of a parsed event.
+#+ATTR_LATEX: :booktabs t
+#+NAME: tab:event
+| Field   | Meaning                                             |
+|---------+-----------------------------------------------------|
+| section | The most recent section header, or =Writing=        |
+| offset  | Days from Monday, taken from the day column         |
+| start   | Start time, zero-padded =HH:MM=                     |
+| end     | End time, zero-padded =HH:MM=                       |
+| letter  | The upper-cased code from the cell                  |
+
+Events are returned in the order they are read, meaning row by row and,
+within a row, in column order. Any implementation that reorders events
+must still produce identical output files, because downstream stages sort
+independently where sorting matters.
+
+** Row kind four, the section header
+
+A row whose first cell is non-empty, contains no time range, and matches
+the pattern below sets the current section:
+
+: ^[A-Za-z][A-Za-z ]*:?$
+
+The trailing colon is optional and is stripped, so both =Generative= and
+=Generative:= set the section to =Generative=. Note that this pattern
+accepts letters and spaces only, so a section named =Deep Work 1= will
+not be recognized. Sections group events in the generated schedule file
+and become an org category.
+
+Before any section header appears, the section is =Writing=. This default
+is *required*, because it appears in generated output.
+
+** Time parsing tolerances
+
+A time range is found anywhere inside the label cell using this pattern:
+
+: ([0-9]{1,2}):[ \t]*([0-9]{2})[ \t]*-+[ \t]*([0-9]{1,2}):[ \t]*([0-9]{2})
+
+Four tolerances follow from it, and all four are *required*, because real
+tables contain all of them.
+
+#+CAPTION: Accepted variations in a time range.
+#+ATTR_LATEX: :booktabs t
+#+NAME: tab:times
+| Input             | Reads as    | Reason                          |
+|-------------------+-------------+---------------------------------|
+| =4:00-5:30=       | 04:00-05:30 | The hour may be one digit       |
+| =16: 30-17: 00=   | 16:30-17:00 | Whitespace may follow the colon |
+| =09:00 -- 10:00=  | 09:00-10:00 | One or more hyphens, with space |
+| =Block 9:00-10:00= | 09:00-10:00 | The range may be embedded       |
+
+Minutes must be exactly two digits. Times are normalized to zero-padded
+=HH:MM= strings on output. The parser performs no range checking, so an
+hour of 25 or a minute of 88 will pass through, and it does not require
+the end to follow the start. A second implementation is *recommended* to
+validate these and report a clear error, because silently emitting a
+malformed calendar event is worse than refusing.
+
+** A worked example
+
+#+BEGIN_EXAMPLE
+| Time <l>          | M  | Tu | W  |
+|-------------------+----+----+----|
+| Generative:       |    |    |    |
+| 04:00-05:30       | A  | B  | A  |
+| Supporting:       |    |    |    |
+| 16: 30-17:00      | EM | EM | EM |
+|-------------------+----+----+----|
+| A: DNPH1 docking  |    |    |    |
+| EM: email         |    |    |    |
+#+END_EXAMPLE
+
+This table yields six events. Three carry the section =Generative= and
+three carry =Supporting=. The codes are =A=, =B=, and =EM=, and the
+legend describes =A= and =EM= but not =B=.
+
+* The generated schedule file
+
+** File naming
+
+The file is named from the Monday of the target week, using the format
+=writing-%s.org= where =%s= is the ISO date, giving
+=writing-2026-01-19.org=. The week Monday is computed as the Monday on or
+before the given date, so any day in a week selects that week.
+
+** Structure
+
+#+BEGIN_EXAMPLE
+#+TITLE: Writing Schedule (week of 2026-01-19)
+#+FILETAGS: :writing:
+#+LaTeX_HEADER: \usepackage[margin=0.5in]{geometry}
+
+# Letter to project map:
+#   A = 0470 (Barat resubmission)
+
+* Generative
+  :PROPERTIES:
+  :CATEGORY: Generative
+  :END:
+** TODO Barat resubmission :A:
+   :PROPERTIES:
+   :WS_CODE: 0470
+   :END:
+   <2026-01-19 Mon 04:00-05:30>
+#+END_EXAMPLE
+
+Sections appear as first-level headlines in the order they first occur
+among the events, not in alphabetical order. Each carries a =CATEGORY=
+property equal to the section name. Each event is a second-level headline
+tagged with its code.
+
+The headline text is chosen by falling back in order, meaning the
+description when one exists, then the project code when one exists, then
+the literal text =Project= followed by the letter. When a project code is
+supplied, it is stored in a =WS_CODE= property.
+
+The =TODO= keyword is present by default and is configurable, including
+turning it off. An implementation must make this configurable, because
+the keyword leaks into calendar summaries.
+
+** The timestamp
+
+Each event carries a single org active timestamp on its own line:
+
+: <YYYY-MM-DD Dow HH:MM-HH:MM>
+
+The day abbreviation is the locale's short weekday name. Emitting the
+English abbreviation is acceptable and is *recommended* for
+predictability across machines.
+
+* The iCalendar file
+
+** How the reference produces it
+
+The reference implementation does not write iCalendar directly. It hands
+the generated org file to org's own exporter, with TODO items excluded,
+active timestamps used as the event times, and stored unique identifiers
+enabled. The =.ics= file is written beside the org file, so it is
+archived by week.
+
+A second implementation should write the file directly, because the
+required subset of RFC 5545 is small and a dependency-free program is
+easier to install.
+
+** Fields
+
+#+CAPTION: Calendar-level fields. The order shown is not significant.
+#+ATTR_LATEX: :booktabs t
+#+NAME: tab:vcal
+| Field         | Value                                          | Level       |
+|---------------+------------------------------------------------+-------------|
+| VERSION       | =2.0=                                          | required    |
+| PRODID        | Identifies the writing program                 | required    |
+| CALSCALE      | =GREGORIAN=                                    | required    |
+| X-WR-CALNAME  | The file base name, for example =writing-2026-01-19= | recommended |
+| X-WR-TIMEZONE | The configured zone, for example =America/Chicago=  | recommended |
+| X-WR-CALDESC  | The org title of the source file               | recommended |
+
+#+CAPTION: Event fields, one VEVENT per block.
+#+ATTR_LATEX: :booktabs t
+#+NAME: tab:vevent
+| Field       | Value                                                 | Level       |
+|-------------+-------------------------------------------------------+-------------|
+| UID         | Globally unique and stable for the event              | required    |
+| DTSTAMP     | Generation time in UTC, =YYYYMMDDTHHMMSSZ=            | required    |
+| DTSTART     | Local start, =YYYYMMDDTHHMMSS=                        | required    |
+| DTEND       | Local end, same form                                  | required    |
+| SUMMARY     | The headline text without the TODO keyword            | required    |
+| DESCRIPTION | The human-readable time range                         | recommended |
+| CATEGORIES  | The code and the section, comma separated             | recommended |
+
+** Time zone handling
+
+The reference writes floating local times, meaning =DTSTART= carries no
+=TZID= parameter and no trailing =Z=, and declares the zone once through
+the =X-WR-TIMEZONE= calendar property. Calendar applications generally
+interpret this as intended.
+
+A second implementation is *recommended* to attach an explicit =TZID= to
+each =DTSTART= and =DTEND= and to include a =VTIMEZONE= component,
+because floating times are ambiguous by definition and the
+=X-WR-TIMEZONE= property is a vendor extension rather than part of the
+standard. This is a deliberate improvement, not a deviation to avoid.
+
+Daylight saving deserves explicit testing. A block at 04:00 in a week
+that straddles a transition must remain at 04:00 local time, which is
+what a named zone gives and a fixed offset does not.
+
+** Line handling
+
+Lines longer than 75 octets must be folded by inserting a carriage return,
+a line feed, and a single space. Line endings are carriage return followed
+by line feed. Commas, semicolons, and backslashes inside text values must
+be escaped with a backslash.
+
+* The printable time-block sheet
+
+** Purpose
+
+The sheet is a paper grid for one day. The planned blocks are printed in
+the first wide column. The remaining wide columns are blank, so the user
+writes a revised plan in the next column each time the day changes. The
+rightmost filled column therefore records what actually happened.
+
+** Geometry
+
+#+CAPTION: Sheet parameters and their defaults.
+#+ATTR_LATEX: :booktabs t
+#+NAME: tab:geom
+| Parameter    | Default | Meaning                                  |
+|--------------+---------+------------------------------------------|
+| start hour   |       4 | First hour printed                       |
+| end hour     |      23 | Last hour printed                        |
+| plan columns |       4 | One planned column plus three revisions  |
+| sub-rows     |       5 | Writing rows per hour                    |
+
+All four must be configurable. The page split places the first half of
+the hours on page one and the rest on page two, computed as the low hour
+plus half of the total hour count, rounded up, minus one. With the
+defaults this gives 4:00 through 13:00 on page one and 14:00 through
+23:00 on page two.
+
+The time column is 1 cm wide and each plan column is 4 cm wide. The
+column rules between plan columns are dashed, and the outer rules are
+solid. Each hour is separated from the next by a horizontal rule, and the
+hour label is printed in the time column on the first sub-row of that
+hour.
+
+Above the grid sits a key line in small type, listing each code with its
+description, joined by commas. Above the grid rows sit a date row and two
+blank rows.
+
+** Placing a block
+
+Rows are numbered globally, so the row index of a time is the hour times
+the sub-row count plus a sub-row within the hour.
+
+#+BEGIN_EXAMPLE
+sub_row(minute)  = min(subrows - 1, floor(minute * subrows / 60))
+start_row        = hour * subrows + sub_row(start_minute)
+end_row          = end_hour * subrows + min(subrows, floor(end_minute * subrows / 60))
+if end_row <= start_row: end_row = start_row + 1
+#+END_EXAMPLE
+
+The block occupies rows from =start_row= up to but not including
+=end_row=. The guard on the last line ensures a block shorter than one
+sub-row still occupies one row.
+
+The block is drawn as a box with heavy rules, meaning a heavy rule above
+the first row, a heavy rule below the last row, and heavy vertical rules
+on both sides of the first plan column for every row in between. The
+label is printed in the first row of the box, in the form of the code,
+then whitespace, then the time range with the leading zero removed from
+each hour, for example =A  4:00-5:30=.
+
+A block that reaches a page boundary is left open at that edge, so a
+block crossing the page break reads as one block across two pages.
+
+** A known approximation
+
+With five sub-rows per hour, each row is twelve minutes, so a block
+boundary at the half hour is drawn about six minutes away from its true
+position. The printed label always shows the exact range, so the
+approximation affects the drawing only.
+
+This is an artifact of building the grid from a table, where a row is the
+smallest unit available. An implementation that draws to a canvas can
+place the box at its exact position and is *recommended* to do so, with
+the sub-row lines kept only as printed guides.
+
+* The editable week export
+
+An implementation should also write one org file per week describing the
+same blocks in editable form, so users can adjust events and export to
+HTML or LaTeX.
+
+#+BEGIN_EXAMPLE
+#+TITLE: Time-Block Sheets, week of 2026-01-19
+#+LaTeX_HEADER: \usepackage[margin=0.5in]{geometry}
+#+OPTIONS: toc:nil
+
+* Key
+- =A= :: DNPH1 docking
+
+* 2026-01-19 (Monday)
+#+CAPTION: Planned time blocks for 2026-01-19 (Monday).
+#+ATTR_LATEX: :booktabs t
+| Time      | Code | Task          | Revision |
+|-----------+------+---------------+----------|
+| 4:00-5:30 | A    | DNPH1 docking |          |
+#+END_EXAMPLE
+
+Days appear in day-column order, and blocks within a day are sorted by
+start time. The Revision column is always empty, because it exists for
+the user to fill in.
+
+* Code descriptions
+
+Descriptions come from two sources. The legend rows of the table are
+specific to that week and take precedence. A persistent dictionary of
+code descriptions, kept in the user's configuration, fills in any code
+the table does not describe. The merge is *required*, because a table
+carrying bare codes must still produce a labeled key.
+
+* Output file names
+
+#+CAPTION: File names produced by the system.
+#+ATTR_LATEX: :booktabs t
+#+NAME: tab:files
+| Output               | Name                         |
+|----------------------+------------------------------|
+| Weekly schedule      | =writing-2026-01-19.org=     |
+| Calendar export      | =writing-2026-01-19.ics=     |
+| Week sheet source    | =sheets-week-2026-01-19.tex= |
+| Week sheet, editable | =sheets-week-2026-01-19.org= |
+| One day's sheet      | =sheet-2026-01-19.tex=       |
+
+The date in every name is the Monday of the week, except for the per-day
+sheet, which carries its own date.
+
+* Directory roles
+
+#+CAPTION: The four directories and what each holds.
+#+ATTR_LATEX: :booktabs t
+#+NAME: tab:dirs
+| Directory    | Holds                                             |
+|--------------+---------------------------------------------------|
+| root         | Dated schedule files and their calendar exports   |
+| =templates/= | Reusable master tables for kinds of weeks         |
+| =tables/=    | This week's working copy, taken from a template    |
+| =sheets/=    | Generated time-block sheets                       |
+
+Keeping input tables out of the root matters, because the agenda scans
+the root for dated event files and should not pick up raw input tables.
+
+* Conformance testing
+
+Two implementations stay aligned by tuning to a fixed reference rather
+than to each other. Keep a directory of fixtures, each holding an input
+table together with the expected schedule file, the expected calendar
+file, and the expected week export. Both test suites read the same
+fixtures, so a format change is made once and both implementations either
+follow or fail loudly.
+
+The following cases are worth fixing in that directory from the start.
+
+#+CAPTION: Recommended conformance fixtures.
+#+ATTR_LATEX: :booktabs t
+#+NAME: tab:fixtures
+| Fixture             | Exercises                                     |
+|---------------------+-----------------------------------------------|
+| Single-letter codes | The common case                               |
+| Multi-letter codes  | Codes of two to four characters               |
+| Two-column legend   | Description taken from the second cell        |
+| Sloppy times        | One-digit hours, spaces after colons, dashes  |
+| Sparse days         | Non-contiguous and out-of-order day columns   |
+| No legend rows      | Fallback to the configured descriptions       |
+| Sections present    | Grouping and the =Writing= default            |
+| Overnight block     | An end time earlier than the start            |
+| Daylight saving week | A transition inside the week                 |
+
+For the sheet, byte comparison across two rendering engines is not
+realistic. Compare structure instead, meaning the page count and the
+drawn box positions within a small tolerance computed from the time
+ranges, and keep one rendered sample as a visual reference.

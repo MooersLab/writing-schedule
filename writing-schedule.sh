@@ -33,8 +33,10 @@ Usage:
   writing-schedule.sh weeks
   writing-schedule.sh template <1-4> [file]
   writing-schedule.sh generate <template-or-file> <date>
+  writing-schedule.sh generate-day <template-or-file> <day|today>
   writing-schedule.sh export <schedule.org>
   writing-schedule.sh sheets <template-or-file> <date> [--per-day]
+  writing-schedule.sh sheet <template-or-file> <date|today> [pdf|org|both]
   writing-schedule.sh save <table-file> <name>
   writing-schedule.sh deps [--install]
   writing-schedule.sh help
@@ -48,10 +50,19 @@ Commands:
                                 week that contains <date> (YYYY-MM-DD).
                                 <template> is a name from 'list' or a path to
                                 an .org table file.
+  generate-day <template> <day> Generate a schedule and an .ics file for one
+                                day. <day> is a date (YYYY-MM-DD) or the word
+                                today. Written as day-<ISO>.org and .ics, so it
+                                does not disturb the weekly archive.
   export <schedule.org>         Export an existing schedule file to .ics.
   sheets <template> <date>      Write printable time-block sheets (LaTeX, and
                                 PDF when pdflatex is available) for the week.
                                 Add --per-day for one PDF per day.
+  sheet <template> <day> [fmt]  Write a printable time-block sheet for one day.
+                                <day> is a date (YYYY-MM-DD) or the word today.
+                                Optional fmt is pdf, org, or both (default both).
+                                Use this to reprint the plan for one day after
+                                you edit that day's cells in the table.
   save <table-file> <name>      Save a table file into the template library
                                 under <name>.
   deps [--install]              Check dependencies. With --install, try to
@@ -202,6 +213,28 @@ cmd_generate() {
   echo "  Outlook (web):  Add calendar > Upload from file."
 }
 
+cmd_generate_day() {
+  have_emacs || { install_emacs_hint; exit 1; }
+  local table_arg="${1:-}"
+  local day="${2:-}"
+  if [ -z "$table_arg" ] || [ -z "$day" ]; then
+    echo "Usage: writing-schedule.sh generate-day <template-or-file> <day|today>" >&2
+    exit 2
+  fi
+  local table
+  if ! table="$(resolve_table "$table_arg")"; then
+    echo "Could not find template or file: $table_arg" >&2
+    echo "Run 'writing-schedule.sh list' to see the templates in:" >&2
+    echo "  $TEMPLATE_DIR" >&2
+    exit 1
+  fi
+  run_emacs "(writing-schedule-batch-generate-day \"$(esc "$table")\" \"$(esc "$day")\")"
+  echo
+  echo "Import the day's .ics into your calendar:"
+  echo "  Apple Calendar: File > Import..., choose the .ics file."
+  echo "  Outlook (web):  Add calendar > Upload from file."
+}
+
 cmd_sheets() {
   have_emacs || { install_emacs_hint; exit 1; }
   local table_arg="${1:-}"
@@ -223,6 +256,26 @@ cmd_sheets() {
   echo "Print the PDF, then write your plan in the first column and revise"
   echo "in the next column each time the day changes.  Edit the org file to"
   echo "adjust the event tables and export the schedule to HTML or LaTeX."
+}
+
+cmd_sheet() {
+  have_emacs || { install_emacs_hint; exit 1; }
+  local table_arg="${1:-}"
+  local day="${2:-}"
+  local fmt="${3:-both}"
+  if [ -z "$table_arg" ] || [ -z "$day" ]; then
+    echo "Usage: writing-schedule.sh sheet <template-or-file> <day|today> [pdf|org|both]" >&2
+    exit 2
+  fi
+  local table
+  if ! table="$(resolve_table "$table_arg")"; then
+    echo "Could not find template or file: $table_arg" >&2
+    exit 1
+  fi
+  run_emacs "(writing-schedule-batch-timeblock-sheet-day \"$(esc "$table")\" \"$(esc "$day")\" nil \"$(esc "$fmt")\")"
+  echo
+  echo "A sheet for the day was written.  Print the PDF, write your plan in"
+  echo "the first column, and revise in the next column as the day changes."
 }
 
 cmd_export() {
@@ -266,8 +319,10 @@ main() {
     weeks)          cmd_weeks "$@" ;;
     template)       cmd_template "$@" ;;
     generate)       cmd_generate "$@" ;;
+    generate-day)   cmd_generate_day "$@" ;;
     export)         cmd_export "$@" ;;
     sheets)         cmd_sheets "$@" ;;
+    sheet)          cmd_sheet "$@" ;;
     save)           cmd_save "$@" ;;
     deps)           check_deps "${1:-}" ;;
     help|-h|--help) usage ;;
