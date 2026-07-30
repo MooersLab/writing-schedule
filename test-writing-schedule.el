@@ -554,8 +554,10 @@ and are used verbatim when set, at call time and in any load order."
          (monday (calendar-absolute-from-gregorian '(1 19 2026)))
          (kd (writing-schedule--timeblock-days parsed monday 6))) ; Sunday
     (should (= (length (cdr kd)) 1))
-    (should (string-match-p "2026-01-25 (Sunday)" (car (car (cdr kd)))))
-    (should (null (cdr (car (cdr kd)))))))
+    (should (string-match-p "2026-01-25 (Sunday)" (nth 0 (car (cdr kd)))))
+    ;; The day now carries (DATE-STR SPANS NOTE); an absent day has no spans.
+    (should (null (nth 1 (car (cdr kd)))))
+    (should (null (nth 2 (car (cdr kd)))))))
 
 ;;;; writing-schedule day-abs and monday-of-abs
 
@@ -605,6 +607,131 @@ and are used verbatim when set, at call time and in any load order."
                       (calendar-absolute-from-gregorian '(1 21 2026)))
                      "/tmp/base/day-2026-01-21.org"))))
 
+;;;; writing-schedule overlap detection and guard
+
+(defun ws-test--ev (offset start end letter &optional section)
+  (list :section (or section "Writing") :offset offset
+        :start start :end end :letter letter))
+
+(ert-deftest writing-schedule/overlaps/same-day-clash ()
+  "Two blocks on the same day whose intervals overlap conflict."
+  (let ((conflicts (writing-schedule--overlaps
+                    (list (ws-test--ev 2 "09:00" "10:30" "B" "Editing")
+                          (ws-test--ev 2 "10:00" "11:00" "C" "Support")))))
+    (should (= (length conflicts) 1))
+    (should (= (plist-get (car conflicts) :offset) 2))
+    (should (equal (plist-get (plist-get (car conflicts) :first) :letter) "B"))
+    (should (equal (plist-get (plist-get (car conflicts) :second) :letter) "C"))))
+
+(ert-deftest writing-schedule/overlaps/touching-blocks-clean ()
+  "Half-open intervals mean touching blocks do not conflict."
+  (should (null (writing-schedule--overlaps
+                 (list (ws-test--ev 0 "04:00" "05:30" "A")
+                       (ws-test--ev 0 "05:30" "07:00" "B"))))))
+
+(ert-deftest writing-schedule/overlaps/identical-blocks-clash ()
+  "Two identical blocks on the same day conflict."
+  (should (= 1 (length (writing-schedule--overlaps
+                        (list (ws-test--ev 0 "09:00" "10:00" "A" "Gen")
+                              (ws-test--ev 0 "09:00" "10:00" "B" "Sup")))))))
+
+(ert-deftest writing-schedule/overlaps/three-blocks-pairs ()
+  "A long block overlaps two others; the middle two do not overlap."
+  (let* ((conflicts (writing-schedule--overlaps
+                     (list (ws-test--ev 2 "09:00" "11:00" "A")
+                           (ws-test--ev 2 "09:30" "09:45" "B")
+                           (ws-test--ev 2 "10:00" "12:00" "C"))))
+         (pairs (mapcar (lambda (c)
+                          (cons (plist-get (plist-get c :first) :letter)
+                                (plist-get (plist-get c :second) :letter)))
+                        conflicts)))
+    (should (equal pairs '(("A" . "B") ("A" . "C"))))))
+
+(ert-deftest writing-schedule/overlaps/different-days-clean ()
+  "Blocks on different days never conflict."
+  (should (null (writing-schedule--overlaps
+                 (list (ws-test--ev 0 "09:00" "10:30" "A")
+                       (ws-test--ev 1 "09:00" "10:30" "B"))))))
+
+(ert-deftest writing-schedule/overlaps/overnight-same-day ()
+  "An overnight block conflicts with a later block on its own day."
+  (should (= 1 (length (writing-schedule--overlaps
+                        (list (ws-test--ev 0 "22:00" "01:00" "A")
+                              (ws-test--ev 0 "23:00" "23:30" "B")))))))
+
+(ert-deftest writing-schedule/overlaps/overnight-no-cross-day ()
+  "The after-midnight tail does not reach the next day."
+  (should (null (writing-schedule--overlaps
+                 (list (ws-test--ev 0 "22:00" "01:00" "A")
+                       (ws-test--ev 1 "00:30" "01:00" "B"))))))
+
+(ert-deftest writing-schedule/overlaps/empty ()
+  "No events, no conflicts."
+  (should (null (writing-schedule--overlaps '()))))
+
+(ert-deftest writing-schedule/overlap-lines/matches-python-wording ()
+  "The formatted line matches the Python port exactly."
+  (let ((lines (writing-schedule--overlap-lines
+                (writing-schedule--overlaps
+                 (list (ws-test--ev 2 "09:00" "10:30" "B" "Editing")
+                       (ws-test--ev 2 "10:00" "11:00" "C" "Support"))))))
+    (should (equal lines
+                   '("Wednesday: 09:00-10:30 [B, Editing] overlaps 10:00-11:00 [C, Support]")))))
+
+(ert-deftest writing-schedule/conflicting-identities/includes-both ()
+  "The identity set holds both clashing blocks and not the clean one."
+  (let* ((a (ws-test--ev 2 "09:00" "10:30" "B" "Editing"))
+         (b (ws-test--ev 2 "10:00" "11:00" "C" "Support"))
+         (clean (ws-test--ev 2 "13:00" "14:00" "D" "Writing"))
+         (ids (writing-schedule--conflicting-identities (list a b clean))))
+    (should (member (writing-schedule--event-identity a) ids))
+    (should (member (writing-schedule--event-identity b) ids))
+    (should-not (member (writing-schedule--event-identity clean) ids))))
+
+(ert-deftest writing-schedule/guard/warn-returns-t ()
+  "The warn action reports and proceeds."
+  (let ((writing-schedule-overlap-action 'warn))
+    (should (writing-schedule--guard-overlaps
+             (list (ws-test--ev 0 "09:00" "10:30" "A" "Gen")
+                   (ws-test--ev 0 "10:00" "11:00" "B" "Sup"))))))
+
+(ert-deftest writing-schedule/guard/error-signals ()
+  "The error action refuses with a user error."
+  (let ((writing-schedule-overlap-action 'error))
+    (should-error
+     (writing-schedule--guard-overlaps
+      (list (ws-test--ev 0 "09:00" "10:30" "A" "Gen")
+            (ws-test--ev 0 "10:00" "11:00" "B" "Sup")))
+     :type 'user-error)))
+
+(ert-deftest writing-schedule/guard/confirm-honors-answer ()
+  "The confirm action returns whatever the prompt answers."
+  (let ((writing-schedule-overlap-action 'confirm)
+        (events (list (ws-test--ev 0 "09:00" "10:30" "A" "Gen")
+                      (ws-test--ev 0 "10:00" "11:00" "B" "Sup"))))
+    (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t)))
+      (should (writing-schedule--guard-overlaps events)))
+    (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) nil)))
+      (should-not (writing-schedule--guard-overlaps events)))))
+
+(ert-deftest writing-schedule/guard/batch-warns-and-proceeds ()
+  "In batch the confirm action prints a warning and proceeds."
+  (let ((writing-schedule-overlap-action 'confirm))
+    (let ((out (with-output-to-string
+                 (should (writing-schedule--guard-overlaps
+                          (list (ws-test--ev 0 "09:00" "10:30" "A" "Gen")
+                                (ws-test--ev 0 "10:00" "11:00" "B" "Sup"))
+                          t)))))
+      (should (string-match-p "warning" out))
+      (should (string-match-p "Monday" out)))))
+
+(ert-deftest writing-schedule/guard/clean-proceeds ()
+  "A clean table proceeds under every action."
+  (dolist (action '(confirm warn error))
+    (let ((writing-schedule-overlap-action action))
+      (should (writing-schedule--guard-overlaps
+               (list (ws-test--ev 0 "09:00" "10:00" "A")))))))
+
 ;;;; writing-schedule--legend-mapping
 
 (ert-deftest writing-schedule/legend-mapping/uses-legend-descriptions ()
@@ -629,6 +756,7 @@ and are used verbatim when set, at call time and in any load order."
                   ("s" . writing-schedule-save-template-table)
                   ("b" . writing-schedule-timeblock-sheets)
                   ("d" . writing-schedule-timeblock-sheet-for-day)
+                  ("k" . writing-schedule-check-overlaps)
                   ("o" . writing-schedule-open-week)
                   ("r" . writing-schedule-open-recent)
                   ("e" . writing-schedule-export-ics)

@@ -135,7 +135,7 @@ Place `writing-schedule.el` on your load path and require it.
 
 The template and table directories default to `templates/` and `tables/` under
 `writing-schedule-directory`, computed each time they are used, so setting the
-base directory is enough, and the load order does not matter. Set
+base directory is enough and the load order does not matter. Set
 `writing-schedule-template-directory` or `writing-schedule-table-directory` only
 when you want templates or working tables somewhere else.
 
@@ -161,7 +161,7 @@ project.
 
 ### 2. Fill the table
 
-Type code into each day cell to assign a project or task to that block.
+Type a code into each day cell to assign a project or task to that block.
 Leave a cell empty to skip that block on that day. The table looks like
 this once filled.
 
@@ -177,7 +177,7 @@ this once filled.
 ```
 
 Put a short project description in the first column of each legend row,
-after the code and colon, for example, a first cell of `A: docking`. That
+after the code and colon, for example a first cell of `A: docking`. That
 description becomes the event title. The parser tolerates irregular
 spacing and single-digit hours, so `9:15 - 10:45`, `04:00-5:30`, and even
 `15:00-16: 30` all work, and a lower-case cell code is normalized to
@@ -193,13 +193,13 @@ projects and two-letter task codes.
 
 ### 3. Generate the schedule
 
-Put the point (cursor) anywhere inside the table and run:
+Put point anywhere inside the table and run:
 
 ```
 M-x writing-schedule-generate
 ```
 
-For each letter, you are asked for a project code and a description. If
+For each letter you are asked for a project code and a description. If
 you typed a description into a legend row, it becomes the default. Then
 you pick any day inside the target week, and the command snaps back to
 that week's Monday. The command writes a dated file for that week, such as
@@ -211,7 +211,7 @@ rather than overwritten.
 ![The prompts writing-schedule-generate asks, with sample responses](imgs/writing-schedule-prompts.png)
 
 *The prompt sequence, with sample responses. The description default
-comes from the legend row, and the agenda step is automatic because it
+comes from the legend row, and the agenda step is automatic, because it
 is controlled by `writing-schedule-add-to-agenda` rather than a prompt.*
 
 When events crop up and a single day changes, edit that day's cells in the
@@ -221,13 +221,25 @@ for that day alone as `day-<ISO>.org` in `writing-schedule-directory`. The
 `day-` prefix keeps it out of the weekly archive, so redoing a day never
 overwrites the week it belongs to.
 
+Because the generative, editing, and support blocks sit in separate row
+groups, it is easy to place two blocks on the same day that overlap. Run
+`M-x writing-schedule-check-overlaps` (bound to `k` in the command map) to
+list any clashes in a temporary buffer, or report a clean table. The generate
+and sheet commands run the same check before they write. The variable
+`writing-schedule-overlap-action` controls what happens when a clash is found.
+Its default, `confirm`, lists the clashes and asks before writing. The value
+`warn` lists them and proceeds, and the value `error` refuses. The batch entry
+points cannot prompt, so they treat `confirm` as `warn`, and the shell wrapper
+adds a `check` subcommand that exits non-zero when a table has a clash. A block
+that crosses midnight is compared only against other blocks on its own day.
+
 ### 4. Sync a calendar
 
 Run `M-x writing-schedule-export-ics`, or from the shell
 `writing-schedule.sh export`, to write the `.ics` file, then import it
 into any calendar application. Because each headline carries a stable
 identifier, importing an edited week updates the matching events rather
-than duplicating them. The steps for the three common calendars are as follows.
+than duplicating them. The steps for the three common calendars follow.
 
 **Apple Calendar (macOS or iOS).** Choose **File > Import...**, select the
 `.ics` file, then pick a calendar.
@@ -389,6 +401,7 @@ so all three become sources of TODO items and timed blocks.
 | `writing-schedule-insert-template` | Insert a blank table for up to 26 projects        |
 | `writing-schedule-generate`        | Parse the table at point and write the org file  |
 | `writing-schedule-generate-for-day` | Write the schedule and calendar for one day, or today, as `day-<ISO>.org` |
+| `writing-schedule-check-overlaps`  | Report overlapping time blocks in the table at point |
 | `writing-schedule-export-ics`      | Export the org file to an `.ics` file            |
 | `writing-schedule-add-to-agenda`   | Add the generated file to `org-agenda-files`     |
 | `writing-schedule-open-week`       | Open an archived week by completion, newest first, or by date with a prefix argument |
@@ -405,9 +418,9 @@ The package ships a prefix keymap, `writing-schedule-command-map`, that
 puts the commands on single keys: `g` generate, `G` generate one day, `t`
 template, `n` new week from template, `f` generate from a saved table, `s`
 save table as template, `b` time-block sheets, `d` time-block sheet for one
-day, `o` open week, `r` open recent, `e` export ics, and `a` add to
-agenda. Bind it under any prefix you like. When `C-c w` is already your
-writing prefix, nest it on a free key such as `c`.
+day, `k` check overlaps, `o` open week, `r` open recent, `e` export ics, and
+`a` add to agenda. Bind it under any prefix you like. When `C-c w` is already
+your writing prefix, nest it on a free key such as `c`.
 
 ```elisp
 (with-eval-after-load 'writing-schedule
@@ -427,6 +440,7 @@ adds which-key labels.
       "C-c w c"   "writing-schedule"
       "C-c w c g" "generate week"
       "C-c w c G" "generate one day"
+      "C-c w c k" "check overlaps"
       "C-c w c t" "insert template"
       "C-c w c n" "new week from template"
       "C-c w c f" "generate from table"
@@ -465,7 +479,7 @@ while you are developing the package.
 ```
 
 Managed by straight from a published repository. Drop `:load-path` and
-give straight the git recipe.
+give straight a git recipe (adjust the host and repo to yours).
 
 ```elisp
 (use-package writing-schedule
@@ -557,6 +571,7 @@ The commands are:
 ./writing-schedule.sh template 4 heavy.org       # or write it to a file
 ./writing-schedule.sh generate three-projects 2026-01-21   # table + date -> schedule + .ics
 ./writing-schedule.sh generate-day three-projects today    # one day's schedule + .ics (a date or "today")
+./writing-schedule.sh check three-projects                 # report overlapping blocks; exit 3 on any
 ./writing-schedule.sh export writing-2026-01-19.org        # re-export a schedule to .ics
 ./writing-schedule.sh sheets three-projects 2026-01-21     # week PDF sheets and an editable org file (add --per-day)
 ./writing-schedule.sh sheet three-projects today           # one day's sheet (a date or "today"); add pdf, org, or both

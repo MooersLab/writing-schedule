@@ -55,6 +55,7 @@
 ;;   `writing-schedule-new-week-from-template'  start this week from a saved template
 ;;   `writing-schedule-generate'                parse the table at point and write the org file
 ;;   `writing-schedule-generate-for-day'        write the schedule and calendar for one day, or today
+;;   `writing-schedule-check-overlaps'          report overlapping time blocks in the table
 ;;   `writing-schedule-timeblock-sheets'        print time-block sheets for the week
 ;;   `writing-schedule-timeblock-sheet-for-day' print a time-block sheet for one day, or today
 ;;   `writing-schedule-open-week'               open an archived week, by completion or by date
@@ -117,6 +118,18 @@ giving a file such as day-2026-01-21.org.  The day- prefix keeps these
 single-day files out of the weekly archive, which lists only the
 writing- files, so a reprinted day never shadows the week it belongs to."
   :type 'string)
+
+(defcustom writing-schedule-overlap-action 'confirm
+  "What the writing commands do when a day has overlapping time blocks.
+The weekly table places generative, editing, and support activities in
+separate row groups, so the same day can carry a block in one group and a
+clashing block in another without your noticing.  The value confirm lists
+the clashes and asks before writing.  The value warn lists them and
+proceeds.  The value error refuses and reports.  The batch entry points
+cannot prompt, so they treat confirm as warn, and error still signals."
+  :type '(choice (const :tag "List and ask before writing" confirm)
+                 (const :tag "List and proceed" warn)
+                 (const :tag "Refuse and report" error)))
 
 (defcustom writing-schedule-template-directory nil
   "Directory of saved context templates.
@@ -206,6 +219,117 @@ The returned strings are always zero padded to five characters."
         (e (+ (* 60 (string-to-number (substring end 0 2)))
               (string-to-number (substring end 3 5)))))
     (- e s)))
+
+(defconst writing-schedule--day-full
+  ["Monday" "Tuesday" "Wednesday" "Thursday" "Friday" "Saturday" "Sunday"]
+  "Full weekday names indexed by Monday offset, so 0 is Monday.
+Fixed English names keep the overlap report identical to the Python
+port regardless of the machine locale.")
+
+(defun writing-schedule--overlap-interval (ev)
+  "Return (START . END) minutes for EV, rolling END past midnight.
+When the end is at or before the start the block crosses midnight, so the
+end gains 1440 minutes, which keeps the interval a positive length."
+  (let* ((sp (plist-get ev :start))
+         (ep (plist-get ev :end))
+         (s (+ (* 60 (string-to-number (substring sp 0 2)))
+               (string-to-number (substring sp 3 5))))
+         (e (+ (* 60 (string-to-number (substring ep 0 2)))
+               (string-to-number (substring ep 3 5)))))
+    (when (<= e s) (setq e (+ e 1440)))
+    (cons s e)))
+
+(defun writing-schedule--overlaps (events)
+  "Return the conflicting pairs in EVENTS, grouped and ordered by day.
+Each conflict is a plist (:offset OFF :first EV1 :second EV2), where EV1
+starts no later than EV2.  Two blocks on the same day conflict when their
+half-open minute intervals overlap.  Blocks on different days never
+conflict, because comparison is same-day only."
+  (let ((conflicts '())
+        (offsets (sort (delete-dups
+                        (mapcar (lambda (e) (plist-get e :offset)) events))
+                       #'<)))
+    (dolist (off offsets)
+      (let* ((day-events
+              (sort (seq-filter (lambda (e) (= (plist-get e :offset) off)) events)
+                    (lambda (a b)
+                      (let ((ia (writing-schedule--overlap-interval a))
+                            (ib (writing-schedule--overlap-interval b)))
+                        (cond ((/= (car ia) (car ib)) (< (car ia) (car ib)))
+                              ((/= (cdr ia) (cdr ib)) (< (cdr ia) (cdr ib)))
+                              (t (string< (plist-get a :letter)
+                                          (plist-get b :letter))))))))
+             (vec (vconcat day-events))
+             (n (length vec)))
+        (dotimes (i n)
+          (let* ((ii (writing-schedule--overlap-interval (aref vec i)))
+                 (si (car ii)) (endi (cdr ii)))
+            (cl-block inner
+              (cl-loop for j from (1+ i) below n do
+                (let* ((jj (writing-schedule--overlap-interval (aref vec j)))
+                       (sj (car jj)) (endj (cdr jj)))
+                  (if (>= sj endi)
+                      (cl-return-from inner)
+                    (when (and (< si endj) (< sj endi))
+                      (push (list :offset off
+                                  :first (aref vec i)
+                                  :second (aref vec j))
+                            conflicts))))))))))
+    (nreverse conflicts)))
+
+(defun writing-schedule--overlap-format-block (ev)
+  "Return a short description of block EV for an overlap report."
+  (format "%s-%s [%s, %s]"
+          (plist-get ev :start) (plist-get ev :end)
+          (plist-get ev :letter) (plist-get ev :section)))
+
+(defun writing-schedule--overlap-lines (conflicts)
+  "Return one human readable line per conflict in CONFLICTS."
+  (mapcar
+   (lambda (c)
+     (format "%s: %s overlaps %s"
+             (aref writing-schedule--day-full (plist-get c :offset))
+             (writing-schedule--overlap-format-block (plist-get c :first))
+             (writing-schedule--overlap-format-block (plist-get c :second))))
+   conflicts))
+
+(defun writing-schedule--event-identity (ev)
+  "Return the identity list naming block EV within a table."
+  (list (plist-get ev :offset) (plist-get ev :start) (plist-get ev :end)
+        (plist-get ev :letter) (plist-get ev :section)))
+
+(defun writing-schedule--conflicting-identities (events)
+  "Return the identities of every block in EVENTS that takes part in a clash."
+  (let ((ids '()))
+    (dolist (c (writing-schedule--overlaps events))
+      (push (writing-schedule--event-identity (plist-get c :first)) ids)
+      (push (writing-schedule--event-identity (plist-get c :second)) ids))
+    ids))
+
+(defun writing-schedule--guard-overlaps (events &optional batch)
+  "Check EVENTS for overlaps and act per `writing-schedule-overlap-action'.
+Return non-nil to proceed and nil to abort.  When BATCH is non-nil the
+caller cannot prompt, so the confirm action behaves like warn and the
+lines are printed with `princ'; the error action still signals."
+  (let ((conflicts (writing-schedule--overlaps events)))
+    (if (null conflicts)
+        t
+      (let* ((lines (writing-schedule--overlap-lines conflicts))
+             (joined (mapconcat (lambda (l) (concat "  " l)) lines "\n")))
+        (cond
+         ((eq writing-schedule-overlap-action 'error)
+          (funcall (if batch #'error #'user-error)
+                   "Overlapping time blocks:\n%s" joined))
+         (batch
+          (princ (concat "warning: overlapping time blocks:\n" joined "\n"))
+          t)
+         ((eq writing-schedule-overlap-action 'warn)
+          (message "Overlapping time blocks:\n%s" joined)
+          t)
+         (t                             ; confirm
+          (yes-or-no-p
+           (format "Overlapping time blocks found:\n%s\nWrite anyway? "
+                   joined))))))))
 
 (defun writing-schedule--parse (table)
   "Parse TABLE from `org-table-to-lisp' into a plist.
@@ -515,6 +639,8 @@ the week to schedule."
          (legend (plist-get parsed :legend)))
     (unless events
       (user-error "No filled time blocks found in this table"))
+    (unless (writing-schedule--guard-overlaps events)
+      (user-error "Aborted because of overlapping time blocks; fix them and retry"))
     (let* ((mapping (writing-schedule--read-mapping letters legend))
            (monday (writing-schedule--week-monday
                     (org-read-date nil t nil "Week to schedule (any day in it): ")))
@@ -580,6 +706,8 @@ for one day."
       (unless events
         (user-error "No filled time blocks for %s"
                     (writing-schedule--iso-date day-abs)))
+      (unless (writing-schedule--guard-overlaps events)
+        (user-error "Aborted because of overlapping time blocks; fix them and retry"))
       (let* ((mapping (writing-schedule--read-mapping
                        (writing-schedule--day-letters events)
                        (plist-get parsed :legend)))
@@ -600,6 +728,32 @@ for one day."
           (writing-schedule-export-ics file))
         (find-file file)
         (message "Wrote %d events to %s" (length events) file)))))
+
+;;;###autoload
+(defun writing-schedule-check-overlaps ()
+  "Report overlapping time blocks in the schedule table at point.
+Display each clash, keyed by weekday, in a temporary buffer, or report a
+clean table in the echo area.  Use this before you generate the schedule,
+the calendar, or the sheets, to catch a block placed in one row group
+that clashes with a block in another group for the same day."
+  (interactive)
+  (unless (org-at-table-p)
+    (user-error "Point is not in an org table.  Move into your schedule table first"))
+  (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+         (conflicts (writing-schedule--overlaps (plist-get parsed :events))))
+    (if (null conflicts)
+        (message "No overlapping time blocks in this table")
+      (let ((lines (writing-schedule--overlap-lines conflicts)))
+        (with-current-buffer (get-buffer-create "*writing-schedule overlaps*")
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (insert "Overlapping time blocks:\n\n")
+            (dolist (l lines) (insert "  " l "\n")))
+          (goto-char (point-min))
+          (special-mode)
+          (display-buffer (current-buffer)))
+        (message "%d overlapping pair%s found"
+                 (length conflicts) (if (= (length conflicts) 1) "" "s"))))))
 
 (defun writing-schedule--blank-row (label nd)
   "Return a table row with LABEL and ND empty day cells."
@@ -896,6 +1050,7 @@ Meant to be called from a shell through Emacs --batch."
              (events (plist-get parsed :events)))
         (unless events
           (error "No filled time blocks found in %s" table))
+        (writing-schedule--guard-overlaps events t)
         (let* ((mapping (writing-schedule--legend-mapping
                          (plist-get parsed :letters)
                          (plist-get parsed :legend)))
@@ -944,6 +1099,7 @@ Emacs --batch."
           (unless events
             (error "No filled time blocks for %s"
                    (writing-schedule--iso-date day-abs)))
+          (writing-schedule--guard-overlaps events t)
           (let* ((mapping (writing-schedule--legend-mapping
                            (writing-schedule--day-letters events)
                            (plist-get parsed :legend)))
@@ -1100,11 +1256,13 @@ and the custom descriptions fill in any codes the legend omits."
          ltr)))
    letters ",\\quad "))
 
-(defun writing-schedule--timeblock-spans (events)
+(defun writing-schedule--timeblock-spans (events &optional marked)
   "Return block spans (START-ROW END-ROW LABEL) for EVENTS.
 A row index is HOUR times the sub-row count plus the sub-row.  START-ROW
 comes from the block start, END-ROW from the block end, so the span
-covers the whole time range."
+covers the whole time range.  When an event's identity is in MARKED, its
+label gains a star, so a block that overlaps another is flagged on the
+printed sheet."
   (let ((sub writing-schedule-timeblock-subrows)
         (spans '()))
     (dolist (ev events)
@@ -1116,10 +1274,13 @@ covers the whole time range."
              (em (string-to-number (cadr ep)))
              (sg (+ (* sh sub) (min (1- sub) (/ (* sm sub) 60))))
              (eg (+ (* eh sub) (min sub (/ (* em sub) 60))))
-             (label (format "%s\\quad %s-%s"
+             (star (if (member (writing-schedule--event-identity ev) marked)
+                       "$^{*}$" ""))
+             (label (format "%s\\quad %s-%s%s"
                             (plist-get ev :letter)
                             (writing-schedule--hhmm-tidy (plist-get ev :start))
-                            (writing-schedule--hhmm-tidy (plist-get ev :end)))))
+                            (writing-schedule--hhmm-tidy (plist-get ev :end))
+                            star)))
         (when (<= eg sg) (setq eg (1+ sg)))
         (push (list sg eg label) spans)))
     spans))
@@ -1186,36 +1347,45 @@ that crosses the page break reads as one block."
             (mapconcat #'identity (nreverse lines) "\n") "\n"
             "\\bottomrule\n\\end{tabular}\n\\end{center}\n")))
 
-(defun writing-schedule--timeblock-day (date-str key-str spans)
-  "Return the two pages of a sheet for DATE-STR, KEY-STR, and SPANS."
+(defun writing-schedule--timeblock-day (date-str key-str spans &optional note)
+  "Return the two pages of a sheet for DATE-STR, KEY-STR, and SPANS.
+When NOTE is non-nil, add a footnote explaining the overlap star."
   (let* ((lo writing-schedule-timeblock-start-hour)
          (hi writing-schedule-timeblock-end-hour)
          (ncols writing-schedule-timeblock-columns)
          (total (1+ (- hi lo)))
-         (mid (+ lo (/ (1+ total) 2) -1)))
+         (mid (+ lo (/ (1+ total) 2) -1))
+         (footnote (if note
+                       (concat "\n\\par\\smallskip{\\footnotesize $^{*}$ "
+                               "overlaps another block on this day.}\n")
+                     "")))
     (concat (writing-schedule--timeblock-page date-str key-str spans lo mid ncols)
             "\n\\newpage\n"
             (writing-schedule--timeblock-page date-str key-str spans
-                                              (1+ mid) hi ncols))))
+                                              (1+ mid) hi ncols)
+            footnote)))
 
 (defun writing-schedule--timeblock-document (key-str days)
   "Return a full LaTeX document from KEY-STR and DAYS.
-DAYS is a list of (DATE-STR . SPANS)."
+DAYS is a list of (DATE-STR SPANS NOTE)."
   (concat (writing-schedule--timeblock-preamble)
           "\n\\begin{document}\n\n"
           (mapconcat (lambda (day)
-                       (writing-schedule--timeblock-day (car day) key-str (cdr day)))
+                       (writing-schedule--timeblock-day
+                        (nth 0 day) key-str (nth 1 day) (nth 2 day)))
                      days "\n\\clearpage\n")
           "\n\\end{document}\n"))
 
 (defun writing-schedule--timeblock-days (parsed monday-abs &optional only-off)
   "Return (KEY-STR . DAYS) for PARSED starting at MONDAY-ABS.
-DAYS is a list of (DATE-STR . CELLS), one per day column in the table.
-When ONLY-OFF is a Monday offset, return just that one day, even when
-the table has no column for it, in which case the day carries no blocks
-and reads as a blank sheet."
+DAYS is a list of (DATE-STR SPANS NOTE), one per day column in the table.
+A block that overlaps another on its day is flagged with a star, and NOTE
+is non-nil for a day that carries such a block.  When ONLY-OFF is a Monday
+offset, return just that one day, even when the table has no column for
+it, in which case the day carries no blocks and reads as a blank sheet."
   (let* ((events (plist-get parsed :events))
          (columns (plist-get parsed :columns))
+         (marked (writing-schedule--conflicting-identities events))
          (key (writing-schedule--timeblock-key
                (plist-get parsed :letters)
                (writing-schedule--effective-legend (plist-get parsed :legend))))
@@ -1228,8 +1398,14 @@ and reads as a blank sheet."
              (abs (+ monday-abs off))
              (greg (calendar-gregorian-from-absolute abs))
              (date-str (format "%s (%s)" (writing-schedule--iso-date abs)
-                               (calendar-day-name greg))))
-        (push (cons date-str (writing-schedule--timeblock-spans day-events)) days)))
+                               (calendar-day-name greg)))
+             (note (seq-some (lambda (e)
+                               (member (writing-schedule--event-identity e) marked))
+                             day-events)))
+        (push (list date-str
+                    (writing-schedule--timeblock-spans day-events marked)
+                    note)
+              days)))
     (cons key (nreverse days))))
 
 (defun writing-schedule--timeblock-org-document (parsed monday &optional only-off)
@@ -1243,6 +1419,7 @@ single day."
          (columns (plist-get parsed :columns))
          (letters (plist-get parsed :letters))
          (legend (writing-schedule--effective-legend (plist-get parsed :legend)))
+         (marked (writing-schedule--conflicting-identities events))
          (offsets (if only-off
                       (list only-off)
                     (sort (delete-dups (mapcar #'cdr columns)) #'<))))
@@ -1279,14 +1456,21 @@ single day."
            (if day-events
                (mapconcat
                 (lambda (e)
-                  (format "| %s-%s | %s | %s | |"
+                  (format "| %s-%s%s | %s | %s | |"
                           (writing-schedule--hhmm-tidy (plist-get e :start))
                           (writing-schedule--hhmm-tidy (plist-get e :end))
+                          (if (member (writing-schedule--event-identity e) marked)
+                              "*" "")
                           (plist-get e :letter)
                           (or (cdr (assoc (plist-get e :letter) legend)) "")))
                 day-events "\n")
              "| | | | |")
-           "\n")))
+           "\n"
+           (if (seq-some (lambda (e)
+                           (member (writing-schedule--event-identity e) marked))
+                         day-events)
+               "\nNote: a time marked with * overlaps another block on this day.\n"
+             ""))))
       offsets "\n"))))
 
 (defun writing-schedule--write-and-compile (tex-file content)
@@ -1364,16 +1548,18 @@ when a LaTeX compiler is available."
   (interactive "P")
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
-  (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
-         (format (intern (completing-read "Output (pdf, org, both): "
-                                          '("pdf" "org" "both") nil t nil nil "both")))
-         (monday (writing-schedule--week-monday
-                  (org-read-date nil t nil "Week for the sheets (any day in it): ")))
-         (files (writing-schedule--timeblock-generate
-                 parsed monday per-day (writing-schedule--sheets-directory) format)))
-    (message "Wrote %d sheet file%s to %s" (length files)
-             (if (= (length files) 1) "" "s") (writing-schedule--sheets-directory))
-    files))
+  (let* ((parsed (writing-schedule--parse (org-table-to-lisp))))
+    (unless (writing-schedule--guard-overlaps (plist-get parsed :events))
+      (user-error "Aborted because of overlapping time blocks; fix them and retry"))
+    (let* ((format (intern (completing-read "Output (pdf, org, both): "
+                                            '("pdf" "org" "both") nil t nil nil "both")))
+           (monday (writing-schedule--week-monday
+                    (org-read-date nil t nil "Week for the sheets (any day in it): ")))
+           (files (writing-schedule--timeblock-generate
+                   parsed monday per-day (writing-schedule--sheets-directory) format)))
+      (message "Wrote %d sheet file%s to %s" (length files)
+               (if (= (length files) 1) "" "s") (writing-schedule--sheets-directory))
+      files)))
 
 ;;;###autoload
 (defun writing-schedule-timeblock-sheet-for-day ()
@@ -1394,12 +1580,15 @@ compiler is available."
          (day-abs (writing-schedule--abs-from-time
                    (org-read-date nil t nil
                                   "Day for the sheet (any date, default today): ")))
-         (monday (writing-schedule--monday-of-abs day-abs))
-         (files (writing-schedule--timeblock-generate
-                 parsed monday nil (writing-schedule--sheets-directory) format day-abs)))
-    (message "Wrote %d sheet file%s to %s" (length files)
-             (if (= (length files) 1) "" "s") (writing-schedule--sheets-directory))
-    files))
+         (monday (writing-schedule--monday-of-abs day-abs)))
+    (unless (writing-schedule--guard-overlaps
+             (writing-schedule--day-events (plist-get parsed :events) monday day-abs))
+      (user-error "Aborted because of overlapping time blocks; fix them and retry"))
+    (let ((files (writing-schedule--timeblock-generate
+                  parsed monday nil (writing-schedule--sheets-directory) format day-abs)))
+      (message "Wrote %d sheet file%s to %s" (length files)
+               (if (= (length files) 1) "" "s") (writing-schedule--sheets-directory))
+      files)))
 
 ;;;###autoload
 (defun writing-schedule-batch-timeblock-sheets (table week &optional per-day out-dir format)
@@ -1424,10 +1613,11 @@ them.  Meant to be called from a shell through emacs --batch."
                     (writing-schedule--sheets-directory)))
              (fmt (if (and format (not (string-empty-p format)))
                       (intern format)
-                    'both))
-             (files (writing-schedule--timeblock-generate parsed monday per-day dir fmt)))
-        (dolist (f files) (princ (format "Wrote %s\n" f)))
-        files))))
+                    'both)))
+        (writing-schedule--guard-overlaps (plist-get parsed :events) t)
+        (let ((files (writing-schedule--timeblock-generate parsed monday per-day dir fmt)))
+          (dolist (f files) (princ (format "Wrote %s\n" f)))
+          files)))))
 
 ;;;###autoload
 (defun writing-schedule-batch-timeblock-sheet-day (table day &optional out-dir format)
@@ -1455,10 +1645,37 @@ written and return them.  Meant to be called from a shell through emacs
                     (writing-schedule--sheets-directory)))
              (fmt (if (and format (not (string-empty-p format)))
                       (intern format)
-                    'both))
-             (files (writing-schedule--timeblock-generate parsed monday nil dir fmt day-abs)))
-        (dolist (f files) (princ (format "Wrote %s\n" f)))
-        files))))
+                    'both)))
+        (writing-schedule--guard-overlaps
+         (writing-schedule--day-events (plist-get parsed :events) monday day-abs) t)
+        (let ((files (writing-schedule--timeblock-generate
+                      parsed monday nil dir fmt day-abs)))
+          (dolist (f files) (princ (format "Wrote %s\n" f)))
+          files)))))
+
+;;;###autoload
+(defun writing-schedule-batch-check (table)
+  "Report overlapping time blocks in TABLE, and return non-nil when any exist.
+Print each clash keyed by weekday.  Meant to be called from a shell
+through emacs --batch, where the shell maps a non-nil return to a
+non-zero exit."
+  (let ((table (expand-file-name table)))
+    (unless (file-readable-p table)
+      (error "Cannot read table file: %s" table))
+    (with-temp-buffer
+      (insert-file-contents table)
+      (org-mode)
+      (goto-char (point-min))
+      (unless (re-search-forward "^[ \t]*|" nil t)
+        (error "No org table found in %s" table))
+      (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+             (conflicts (writing-schedule--overlaps (plist-get parsed :events))))
+        (if (null conflicts)
+            (progn (princ (format "No overlapping time blocks in %s\n" table)) nil)
+          (princ (format "Overlapping time blocks in %s:\n" table))
+          (dolist (l (writing-schedule--overlap-lines conflicts))
+            (princ (concat "  " l "\n")))
+          t)))))
 
 ;;;; Suggested key map
 
@@ -1473,6 +1690,7 @@ written and return them.  Meant to be called from a shell through emacs
     (define-key map "s" #'writing-schedule-save-template-table)
     (define-key map "b" #'writing-schedule-timeblock-sheets)
     (define-key map "d" #'writing-schedule-timeblock-sheet-for-day)
+    (define-key map "k" #'writing-schedule-check-overlaps)
     (define-key map "o" #'writing-schedule-open-week)
     (define-key map "r" #'writing-schedule-open-recent)
     (define-key map "e" #'writing-schedule-export-ics)
@@ -1487,8 +1705,8 @@ under its \"c\" key:
 
 The keys are g generate, G generate one day, t template, n new week from
 template, f generate from a saved table, s save table as template,
-b time-block sheets, d time-block sheet for one day, o open week,
-r open recent, e export ics, and a add to agenda.")
+b time-block sheets, d time-block sheet for one day, k check overlaps,
+o open week, r open recent, e export ics, and a add to agenda.")
 
 (provide 'writing-schedule)
 ;;; writing-schedule.el ends here

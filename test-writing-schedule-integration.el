@@ -916,5 +916,87 @@ newline is still saved with one."
     (goto-char (point-min))
     (should-error (writing-schedule-timeblock-sheets) :type 'user-error)))
 
+(defconst writing-schedule-test--clash
+  (concat "| Time <l> | M | Tu |\n"
+          "|-\n"
+          "| Generative |  |  |\n"
+          "| 09:00-10:30 | A | C |\n"
+          "|-\n"
+          "| Support |  |  |\n"
+          "| 10:00-11:00 | B |  |\n"
+          "|-\n"
+          "| A: writing |  |  |\n"
+          "| B: email |  |  |\n"
+          "| C: outline |  |  |\n")
+  "A table whose Monday carries two overlapping blocks in different groups.")
+
+(ert-deftest writing-schedule/integration/batch-check-reports-and-returns-t ()
+  "The batch check prints the clash and returns non-nil on an overlap."
+  :tags '(integration)
+  (let ((f (make-temp-file "ws-clash" nil ".org")))
+    (unwind-protect
+        (progn
+          (with-temp-file f (insert writing-schedule-test--clash))
+          (let* ((result nil)
+                 (out (with-output-to-string
+                        (setq result (writing-schedule-batch-check f)))))
+            (should result)
+            (should (string-match-p "Monday" out))
+            (should (string-match-p "overlaps" out))))
+      (delete-file f))))
+
+(ert-deftest writing-schedule/integration/batch-check-clean-returns-nil ()
+  "The batch check returns nil for a clean table."
+  :tags '(integration)
+  (let ((f (make-temp-file "ws-clean" nil ".org")))
+    (unwind-protect
+        (progn
+          (with-temp-file f (insert writing-schedule-test--example))
+          (should-not
+           (with-temp-buffer
+             (let ((standard-output (current-buffer)))
+               (writing-schedule-batch-check f)))))
+      (delete-file f))))
+
+(ert-deftest writing-schedule/integration/sheet-marks-overlap ()
+  "A day-sheet org export marks the clashing blocks and adds the note."
+  :tags '(integration)
+  (let* ((out-dir (make-temp-file "ws-clash-out" t)))
+    (unwind-protect
+        (with-temp-buffer
+          (insert writing-schedule-test--clash)
+          (org-mode)
+          (goto-char (point-min))
+          (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+                 (monday (calendar-absolute-from-gregorian '(1 19 2026)))
+                 (files (writing-schedule--timeblock-generate
+                         parsed monday nil out-dir 'org monday))
+                 (org (seq-find (lambda (f) (string-suffix-p ".org" f)) files))
+                 (text (with-temp-buffer (insert-file-contents org) (buffer-string))))
+            (should (string-match-p "9:00-10:30\\*" text))
+            (should (string-match-p "overlaps another block" text))))
+      (delete-directory out-dir t))))
+
+(ert-deftest writing-schedule/integration/generate-aborts-on-overlap-confirm-no ()
+  "With confirm and a negative answer, generate writes nothing."
+  :tags '(integration)
+  (let* ((dir (make-temp-file "ws-clash-arch" t))
+         (writing-schedule-directory dir)
+         (writing-schedule-overlap-action 'confirm)
+         (org-agenda-files '()))
+    (unwind-protect
+        (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) nil))
+                  ((symbol-function 'read-string) (lambda (&rest _) ""))
+                  ((symbol-function 'org-read-date)
+                   (lambda (&rest _) (org-read-date nil t "2026-01-21"))))
+          (with-temp-buffer
+            (insert writing-schedule-test--clash)
+            (org-mode)
+            (goto-char (point-min))
+            (search-forward "|")
+            (should-error (writing-schedule-generate) :type 'user-error))
+          (should (null (directory-files dir nil "writing-.*\\.org"))))
+      (delete-directory dir t))))
+
 (provide 'test-writing-schedule-integration)
 ;;; test-writing-schedule-integration.el ends here

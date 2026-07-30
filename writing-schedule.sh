@@ -28,6 +28,10 @@ usage() {
   cat <<EOF
 writing-schedule.sh - generate a writing schedule and a calendar file
 
+Run this tool from the root of the writing-schedule directory, because it
+resolves the bundled templates, examples, and writing-schedule.el relative
+to that directory.
+
 Usage:
   writing-schedule.sh list
   writing-schedule.sh weeks
@@ -37,6 +41,7 @@ Usage:
   writing-schedule.sh export <schedule.org>
   writing-schedule.sh sheets <template-or-file> <date> [--per-day]
   writing-schedule.sh sheet <template-or-file> <date|today> [pdf|org|both]
+  writing-schedule.sh check <template-or-file>
   writing-schedule.sh save <table-file> <name>
   writing-schedule.sh deps [--install]
   writing-schedule.sh help
@@ -63,6 +68,9 @@ Commands:
                                 Optional fmt is pdf, org, or both (default both).
                                 Use this to reprint the plan for one day after
                                 you edit that day's cells in the table.
+  check <template>              Report overlapping time blocks in the table.
+                                Exit 3 when any are found, so a commit hook or
+                                CI step can gate on a clean schedule.
   save <table-file> <name>      Save a table file into the template library
                                 under <name>.
   deps [--install]              Check dependencies. With --install, try to
@@ -294,6 +302,22 @@ cmd_export() {
   run_emacs "(writing-schedule-export-ics \"$(esc "$abs")\")"
 }
 
+cmd_check() {
+  have_emacs || { install_emacs_hint; exit 1; }
+  local table_arg="${1:-}"
+  if [ -z "$table_arg" ]; then
+    echo "Usage: writing-schedule.sh check <template-or-file>" >&2
+    exit 2
+  fi
+  local table
+  if ! table="$(resolve_table "$table_arg")"; then
+    echo "Could not find template or file: $table_arg" >&2
+    exit 1
+  fi
+  # Exit 3 when the table has overlapping blocks, so a hook or CI can gate on it.
+  run_emacs "(kill-emacs (if (writing-schedule-batch-check \"$(esc "$table")\") 3 0))"
+}
+
 cmd_save() {
   have_emacs || { install_emacs_hint; exit 1; }
   local file="${1:-}"
@@ -323,6 +347,7 @@ main() {
     export)         cmd_export "$@" ;;
     sheets)         cmd_sheets "$@" ;;
     sheet)          cmd_sheet "$@" ;;
+    check)          cmd_check "$@" ;;
     save)           cmd_save "$@" ;;
     deps)           check_deps "${1:-}" ;;
     help|-h|--help) usage ;;

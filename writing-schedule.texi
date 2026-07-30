@@ -165,6 +165,17 @@ disturbing the weekly archive. Use this when events crop up and you need a
 fresh plan for one day.
 @end deffn
 
+@deffn Command writing-schedule-check-overlaps
+Report overlapping time blocks in the schedule table at point.  The table
+places generative, editing, and support activities in separate row groups,
+so the same day can carry a block in one group and a clashing block in
+another without your noticing.  Display each clash, keyed by weekday, in a
+temporary buffer, or report a clean table in the echo area.  Two blocks
+that merely touch, for example 04:00-05:30 then 05:30-07:00, do not clash,
+and a block that crosses midnight is compared only against other blocks on
+its own day.
+@end deffn
+
 @deffn Command writing-schedule-export-ics &optional file
 Export @var{file}, or the current week's dated file when @var{file} is
 omitted, to an iCalendar file through org's @code{ox-icalendar} back-end.
@@ -261,6 +272,14 @@ The format of a single-day file name. The @samp{%s} is replaced by the
 day in ISO form, giving a file such as @file{day-2026-01-21.org}. The
 @samp{day-} prefix keeps these files out of the weekly archive, which
 lists only the @samp{writing-} files. The default is @code{"day-%s.org"}.
+@end defvr
+
+@defvr {User Option} writing-schedule-overlap-action
+What the writing commands do when a day has overlapping time blocks. The
+value @code{confirm}, the default, lists the clashes and asks before
+writing. The value @code{warn} lists them and proceeds. The value
+@code{error} refuses and reports. The batch entry points cannot prompt, so
+they treat @code{confirm} as @code{warn}, and @code{error} still signals.
 @end defvr
 
 @defvr {User Option} writing-schedule-template-directory
@@ -435,6 +454,14 @@ Write printable time-block sheets from @var{table} for @var{week}.
 Non-nil PER-DAY writes one PDF per day, else one for the week.
 @var{out-dir} overrides the sheets directory. @var{format} is the string
 @samp{pdf}, @samp{org}, or @samp{both}, and defaults to both.
+@end deffn
+
+@deffn Command writing-schedule-batch-check table
+Report overlapping time blocks in TABLE, printing each clash keyed by
+weekday, and return non-nil when any exist.  Meant to be called from a
+shell through emacs --batch, where the shell maps a non-nil return to a
+non-zero exit.  The shell wrapper's @command{check} subcommand does this
+and exits 3 on a clash.
 @end deffn
 
 @deffn Command writing-schedule-batch-generate-day table day &optional out-dir
