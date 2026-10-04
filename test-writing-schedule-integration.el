@@ -418,7 +418,8 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
   "The command signals when the template directory has no templates."
   :tags '(integration)
   (let* ((tdir (make-temp-file "ws-templates" t))
-         (writing-schedule-template-directory tdir))
+         (writing-schedule-template-directory tdir)
+         (writing-schedule-include-bundled-templates nil))
     (unwind-protect
         (should-error (writing-schedule-new-week-from-template) :type 'user-error)
       (delete-directory tdir t))))
@@ -597,7 +598,8 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
   "The command signals when the template directory has no tables."
   :tags '(integration)
   (let* ((dir (make-temp-file "ws-tpl" t))
-         (writing-schedule-template-directory dir))
+         (writing-schedule-template-directory dir)
+         (writing-schedule-include-bundled-templates nil))
     (unwind-protect
         (should-error (writing-schedule-generate-from-template) :type 'user-error)
       (delete-directory dir t))))
@@ -997,6 +999,39 @@ newline is still saved with one."
             (should-error (writing-schedule-generate) :type 'user-error))
           (should (null (directory-files dir nil "writing-.*\\.org"))))
       (delete-directory dir t))))
+
+;;;; Bundled templates
+
+(ert-deftest writing-schedule/integration/bundled-templates-are-offered ()
+  "The shipped templates follow your own, and your own hide a namesake."
+  :tags '(integration)
+  (let* ((tdir (make-temp-file "ws-templates" t))
+         (writing-schedule-template-directory tdir)
+         (writing-schedule-include-bundled-templates t))
+    (unwind-protect
+        (progn
+          (with-temp-file (expand-file-name "5gA.org" tdir) (insert "| mine |\n"))
+          (with-temp-file (expand-file-name "teaching.org" tdir) (insert "| mine |\n"))
+          (let ((files (writing-schedule-template-files)))
+            (should (assoc "4gAeA-gW.org" files))
+            (should (assoc "teaching.org" files))
+            (should (equal (cdr (assoc "5gA.org" files)) (expand-file-name "5gA.org" tdir)))
+            (should (equal (mapcar #'car files) (sort (mapcar #'car files) #'string<))))
+          (let ((writing-schedule-include-bundled-templates nil))
+            (should (equal (mapcar #'car (writing-schedule-template-files))
+                           '("5gA.org" "teaching.org")))))
+      (delete-directory tdir t))))
+
+(ert-deftest writing-schedule/integration/bundled-templates-parse ()
+  "Every bundled template is a weekly table that the parser reads."
+  :tags '(integration)
+  (let ((files (directory-files writing-schedule-bundled-template-directory t "\\.org\\'")))
+    (should (>= (length files) 13))
+    (dolist (f files)
+      (let ((parsed (writing-schedule-parse-text
+                     (with-temp-buffer (insert-file-contents f) (buffer-string)))))
+        (should (plist-get parsed :events))
+        (should (plist-get parsed :legend))))))
 
 (provide 'test-writing-schedule-integration)
 ;;; test-writing-schedule-integration.el ends here

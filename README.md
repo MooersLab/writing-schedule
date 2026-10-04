@@ -412,6 +412,18 @@ so all three become sources of TODO items and timed blocks.
 | `writing-schedule-timeblock-sheets`             | Print two-page time-block sheets for the week      |
 | `writing-schedule-timeblock-sheet-for-day`      | Print a two-page time-block sheet for one day, or today |
 
+## Bundled templates
+
+Version 0.3.1 ships thirteen weekly templates in `templates/`. Each is named
+by its schedule code, so `4gAeA-gW.org` fills four days with a generative and
+an editing block for project A and gives Friday to project W. The commands
+that choose a template, `writing-schedule-new-week-from-template` and
+`writing-schedule-generate-from-template`, offer your own templates first and
+then the bundled ones. A template of your own with the same file name hides
+the bundled one. Set `writing-schedule-include-bundled-templates` to nil to see
+only your own. From the shell, `writing-schedule.sh generate 4gAeA-gW 2026-01-19`
+finds a bundled template by name when your template directory has none.
+
 ## Public API for other packages
 
 Version 0.3.1 promotes the table parser and the overlap test to public

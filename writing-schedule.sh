@@ -174,6 +174,9 @@ resolve_table() {
   fi
   if [ -f "$TEMPLATE_DIR/$arg" ]; then printf '%s/%s\n' "$TEMPLATE_DIR" "$arg"; return 0; fi
   if [ -f "$TEMPLATE_DIR/$arg.org" ]; then printf '%s/%s.org\n' "$TEMPLATE_DIR" "$arg"; return 0; fi
+  # Fall back to the templates that ship with the package.
+  if [ -f "$WS_DIR/templates/$arg" ]; then printf '%s/%s\n' "$WS_DIR/templates" "$arg"; return 0; fi
+  if [ -f "$WS_DIR/templates/$arg.org" ]; then printf '%s/%s.org\n' "$WS_DIR/templates" "$arg"; return 0; fi
   return 1
 }
 

@@ -144,6 +144,20 @@ matter.  Set this only to place templates somewhere else."
   :type '(choice (const :tag "Derive from writing-schedule-directory" nil)
                  directory))
 
+(defconst writing-schedule-bundled-template-directory
+  (expand-file-name "templates"
+                    (file-name-directory (or load-file-name buffer-file-name
+                                             default-directory)))
+  "Directory of the weekly templates that ship with this package.
+The templates are named by their schedule codes, for example 4gAeA-gW.org,
+so the name of a template says which blocks it fills.")
+
+(defcustom writing-schedule-include-bundled-templates t
+  "When non-nil, offer the bundled templates after your own.
+The bundled templates live in `writing-schedule-bundled-template-directory'.
+A template of your own with the same file name hides the bundled one."
+  :type 'boolean)
+
 (defcustom writing-schedule-table-directory nil
   "Directory where the working table for each week is copied.
 `writing-schedule-new-week-from-template' places this week's copy of
@@ -505,6 +519,21 @@ directory works regardless of load order."
   (if writing-schedule-template-directory
       (expand-file-name writing-schedule-template-directory)
     (expand-file-name "templates" writing-schedule-directory)))
+
+(defun writing-schedule-template-files ()
+  "Return the available templates as an alist of (NAME . PATH), sorted by NAME.
+Your own templates in the template directory come first and hide a
+bundled template of the same name.  The bundled templates follow when
+`writing-schedule-include-bundled-templates' is non-nil."
+  (let ((out '()))
+    (dolist (dir (cons (writing-schedule--template-directory)
+                       (and writing-schedule-include-bundled-templates
+                            (list writing-schedule-bundled-template-directory))))
+      (when (file-directory-p dir)
+        (dolist (f (directory-files dir nil "\\.org\\'" t))
+          (unless (assoc f out)
+            (push (cons f (expand-file-name f dir)) out)))))
+    (sort out (lambda (a b) (string< (car a) (car b))))))
 
 (defun writing-schedule--table-directory ()
   "Return the directory of working tables.
@@ -954,14 +983,13 @@ placing the letters into a one-time choice per context, for example a
 teaching week, a meeting week, or a writing retreat."
   (interactive)
   (let* ((tdir (writing-schedule--template-directory))
-         (templates (and (file-directory-p tdir)
-                         (directory-files tdir nil "\\.org\\'" t))))
+         (templates (writing-schedule-template-files)))
     (unless templates
       (user-error "No templates found in %s.  Add filled table files there first"
                   tdir))
     (let* ((choice (completing-read "Start this week from template: "
-                                    (sort templates #'string<) nil t))
-           (source (expand-file-name choice tdir))
+                                    (mapcar #'car templates) nil t))
+           (source (cdr (assoc choice templates)))
            (monday (writing-schedule-week-monday (current-time)))
            (dest (writing-schedule-table-file-for-week monday))
            (overwrite (or (not (file-exists-p dest))
@@ -998,13 +1026,12 @@ Use this when a saved table already matches the coming week.  Use
 table and adjust a few letters before generating."
   (interactive)
   (let* ((tdir (writing-schedule--template-directory))
-         (tables (and (file-directory-p tdir)
-                      (directory-files tdir nil "\\.org\\'" t))))
+         (tables (writing-schedule-template-files)))
     (unless tables
       (user-error "No tables found in %s.  Add filled tables there first" tdir))
     (let* ((choice (completing-read "Generate from table: "
-                                    (sort tables #'string<) nil t))
-           (source (expand-file-name choice tdir))
+                                    (mapcar #'car tables) nil t))
+           (source (cdr (assoc choice tables)))
            (buffer (get-buffer-create (format "*writing-schedule: %s*" choice))))
       (with-current-buffer buffer
         (erase-buffer)
@@ -1062,8 +1089,10 @@ DIRECTORY defaults to the directory returned by
 a shell through Emacs --batch, so that people who do not use Emacs can
 still see which schedules are available.  Return the template file names."
   (let* ((dir (expand-file-name (or directory (writing-schedule--template-directory))))
-         (files (and (file-directory-p dir)
-                     (sort (directory-files dir nil "\\.org\\'" t) #'string<))))
+         (files (if directory
+                    (and (file-directory-p dir)
+                         (sort (directory-files dir nil "\\.org\\'" t) #'string<))
+                  (mapcar #'car (writing-schedule-template-files)))))
     (if files
         (dolist (f files) (princ (format "%s\n" f)))
       (princ (format "No templates found in %s\n" dir)))
