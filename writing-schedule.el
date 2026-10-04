@@ -3,7 +3,7 @@
 ;; Author: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Assisted-by: Claude Code:claude-opus-4-8
 ;; Maintainer: Blaine Mooers <blaine-mooers@ou.edu>
-;; Version: 0.1.0
+;; Version: 0.3.1
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: calendar, outlines, convenience
 ;; URL: https://github.com/MooersLab/writing-schedule
@@ -197,11 +197,11 @@ Whitespace after a colon is tolerated, so 16: 30 reads as 16:30.")
     ("su" . 6) ("sun" . 6))
   "Map a lower-case day abbreviation to an offset from Monday.")
 
-(defun writing-schedule--day-offset (cell)
+(defun writing-schedule-day-offset (cell)
   "Return the Monday offset for CELL when it names a day, else nil."
   (cdr (assoc (downcase (string-trim (or cell ""))) writing-schedule--day-alist)))
 
-(defun writing-schedule--parse-time (cell)
+(defun writing-schedule-parse-time (cell)
   "Return (START . END) as HH:MM strings from CELL, or nil.
 The returned strings are always zero padded to five characters."
   (when (and cell (string-match writing-schedule--time-regexp cell))
@@ -212,7 +212,7 @@ The returned strings are always zero padded to five characters."
                   (string-to-number (match-string 3 cell))
                   (string-to-number (match-string 4 cell))))))
 
-(defun writing-schedule--minutes (start end)
+(defun writing-schedule-minutes-between (start end)
   "Return the number of minutes between START and END HH:MM strings."
   (let ((s (+ (* 60 (string-to-number (substring start 0 2)))
               (string-to-number (substring start 3 5))))
@@ -239,7 +239,7 @@ end gains 1440 minutes, which keeps the interval a positive length."
     (when (<= e s) (setq e (+ e 1440)))
     (cons s e)))
 
-(defun writing-schedule--overlaps (events)
+(defun writing-schedule-overlaps (events)
   "Return the conflicting pairs in EVENTS, grouped and ordered by day.
 Each conflict is a plist (:offset OFF :first EV1 :second EV2), where EV1
 starts no later than EV2.  Two blocks on the same day conflict when their
@@ -283,7 +283,7 @@ conflict, because comparison is same-day only."
           (plist-get ev :start) (plist-get ev :end)
           (plist-get ev :letter) (plist-get ev :section)))
 
-(defun writing-schedule--overlap-lines (conflicts)
+(defun writing-schedule-overlap-lines (conflicts)
   "Return one human readable line per conflict in CONFLICTS."
   (mapcar
    (lambda (c)
@@ -298,10 +298,10 @@ conflict, because comparison is same-day only."
   (list (plist-get ev :offset) (plist-get ev :start) (plist-get ev :end)
         (plist-get ev :letter) (plist-get ev :section)))
 
-(defun writing-schedule--conflicting-identities (events)
+(defun writing-schedule-conflicting-identities (events)
   "Return the identities of every block in EVENTS that takes part in a clash."
   (let ((ids '()))
-    (dolist (c (writing-schedule--overlaps events))
+    (dolist (c (writing-schedule-overlaps events))
       (push (writing-schedule--event-identity (plist-get c :first)) ids)
       (push (writing-schedule--event-identity (plist-get c :second)) ids))
     ids))
@@ -311,10 +311,10 @@ conflict, because comparison is same-day only."
 Return non-nil to proceed and nil to abort.  When BATCH is non-nil the
 caller cannot prompt, so the confirm action behaves like warn and the
 lines are printed with `princ'; the error action still signals."
-  (let ((conflicts (writing-schedule--overlaps events)))
+  (let ((conflicts (writing-schedule-overlaps events)))
     (if (null conflicts)
         t
-      (let* ((lines (writing-schedule--overlap-lines conflicts))
+      (let* ((lines (writing-schedule-overlap-lines conflicts))
              (joined (mapconcat (lambda (l) (concat "  " l)) lines "\n")))
         (cond
          ((eq writing-schedule-overlap-action 'error)
@@ -331,7 +331,7 @@ lines are printed with `princ'; the error action still signals."
            (format "Overlapping time blocks found:\n%s\nWrite anyway? "
                    joined))))))))
 
-(defun writing-schedule--parse (table)
+(defun writing-schedule-parse-table (table)
   "Parse TABLE from `org-table-to-lisp' into a plist.
 The plist keys are :events, :legend, :letters, and :columns.
 An event is a plist with keys :section, :offset, :start, :end,
@@ -348,10 +348,10 @@ and :letter."
           (cond
            ;; Header row.  It is the first row that names weekdays.
            ((and (null columns)
-                 (cl-some #'writing-schedule--day-offset (cdr cells)))
+                 (cl-some #'writing-schedule-day-offset (cdr cells)))
             (let ((i 0))
               (dolist (c cells)
-                (let ((off (writing-schedule--day-offset c)))
+                (let ((off (writing-schedule-day-offset c)))
                   (when (and off (> i 0))
                     (push (cons i off) columns)))
                 (setq i (1+ i))))
@@ -369,8 +369,8 @@ and :letter."
                 (setq desc (string-trim (mapconcat #'identity (cdr cells) " "))))
               (push (cons ltr desc) legend)))
            ;; Time-block row.
-           ((and columns (writing-schedule--parse-time label))
-            (let ((range (writing-schedule--parse-time label)))
+           ((and columns (writing-schedule-parse-time label))
+            (let ((range (writing-schedule-parse-time label)))
               (dolist (col columns)
                 (let ((cell (nth (car col) cells)))
                   (when (and cell (not (string-empty-p cell)))
@@ -385,13 +385,57 @@ and :letter."
            ;; Section header.  A word or words, no time, non-empty.
            ((and (not (string-empty-p label))
                  (string-match "\\`[A-Za-z][A-Za-z ]*:?\\'" label)
-                 (not (writing-schedule--parse-time label)))
+                 (not (writing-schedule-parse-time label)))
             (setq section (string-trim (replace-regexp-in-string ":" "" label))))
            (t nil)))))
     (list :events (nreverse events)
           :legend (nreverse legend)
           :letters (sort letters #'string<)
           :columns columns)))
+
+;;;; Raw table text
+
+(defun writing-schedule-split-row (line &optional raw)
+  "Split one org table LINE such as \"| a | b |\" into a list of cells.
+The outer pipes are dropped and the line is split on the interior pipes.
+Each cell is trimmed, so \"| a | b |\" gives (\"a\" \"b\"), which matches
+`split_row' in the Python port.  When RAW is non-nil the cells keep their
+padding, so joining them with \"|\" between outer pipes rebuilds the
+line.  An editor that rewrites one cell and must leave every other byte
+of the file alone uses the RAW form."
+  (let ((s (if raw
+               (string-trim-left (string-trim-right line "[\n\r]+") "[ \t]+")
+             (string-trim line))))
+    (when (string-prefix-p "|" s) (setq s (substring s 1)))
+    (when (and (string-suffix-p "|" s)
+               (or (not raw) (> (length s) 0)))
+      (setq s (substring s 0 -1)))
+    (let ((cells (split-string s "|")))
+      (if raw cells (mapcar #'string-trim cells)))))
+
+(defun writing-schedule-table-lines-to-lisp (text)
+  "Return the first org table in TEXT in the shape of `org-table-to-lisp'.
+Each row is either the symbol `hline' or a list of trimmed cell strings.
+Lines outside the first run of table lines are ignored, so a table
+inside a larger org document parses cleanly.  No org buffer is needed."
+  (let ((rows '()) (in-table nil) (done nil))
+    (dolist (line (split-string text "\n"))
+      (unless done
+        (cond
+         ((string-match-p "\\`[ \t]*|" line)
+          (setq in-table t)
+          (push (if (string-match-p "\\`[ \t]*|[-+]" line)
+                    'hline
+                  (writing-schedule-split-row line))
+                rows))
+         (in-table (setq done t)))))
+    (nreverse rows)))
+
+(defun writing-schedule-parse-text (text)
+  "Parse the first weekly table in the string TEXT.
+Return the same plist as `writing-schedule-parse-table', with the keys
+:events, :legend, :letters, and :columns."
+  (writing-schedule-parse-table (writing-schedule-table-lines-to-lisp text)))
 
 ;;;; Date helpers
 
@@ -407,7 +451,7 @@ and :letter."
          (dow (calendar-day-of-week greg))) ; 0 is Sunday, 6 is Saturday
     (- abs (if (= dow 0) 6 (1- dow)))))
 
-(defun writing-schedule--week-monday (time)
+(defun writing-schedule-week-monday (time)
   "Return the absolute calendar date of the Monday on or before TIME."
   (writing-schedule--monday-of-abs (writing-schedule--abs-from-time time)))
 
@@ -426,7 +470,7 @@ today."
        (current-time)
      (org-read-date nil t spec))))
 
-(defun writing-schedule--iso-date (abs)
+(defun writing-schedule-iso-date (abs)
   "Return the ISO date string, such as 2026-01-19, for absolute date ABS."
   (let ((greg (calendar-gregorian-from-absolute abs)))
     (format "%04d-%02d-%02d" (nth 2 greg) (nth 0 greg) (nth 1 greg))))
@@ -436,7 +480,7 @@ today."
 The file lives in `writing-schedule-directory' and is named
 according to `writing-schedule-file-format'."
   (expand-file-name (format writing-schedule-file-format
-                            (writing-schedule--iso-date monday-abs))
+                            (writing-schedule-iso-date monday-abs))
                     writing-schedule-directory))
 
 (defun writing-schedule-day-file-for-day (day-abs)
@@ -444,13 +488,13 @@ according to `writing-schedule-file-format'."
 The file lives in `writing-schedule-directory' and is named according to
 `writing-schedule-day-file-format'."
   (expand-file-name (format writing-schedule-day-file-format
-                            (writing-schedule--iso-date day-abs))
+                            (writing-schedule-iso-date day-abs))
                     writing-schedule-directory))
 
 (defun writing-schedule--current-week-file ()
   "Return the archival file path for the current week."
   (writing-schedule-file-for-week
-   (writing-schedule--week-monday (current-time))))
+   (writing-schedule-week-monday (current-time))))
 
 (defun writing-schedule--template-directory ()
   "Return the directory of saved templates.
@@ -474,7 +518,7 @@ derive a tables subdirectory from `writing-schedule-directory'."
   "Return the working table path for the week beginning MONDAY-ABS.
 The file lives in the directory returned by
 `writing-schedule--table-directory'."
-  (expand-file-name (format "table-%s.org" (writing-schedule--iso-date monday-abs))
+  (expand-file-name (format "table-%s.org" (writing-schedule-iso-date monday-abs))
                     (writing-schedule--table-directory)))
 
 (defun writing-schedule--timestamp (monday-abs offset start end)
@@ -484,7 +528,7 @@ START and END are HH:MM strings."
   (let* ((abs (+ monday-abs offset))
          (greg (calendar-gregorian-from-absolute abs))
          (dow (calendar-day-name greg t)))
-    (format "<%s %s %s-%s>" (writing-schedule--iso-date abs) dow start end)))
+    (format "<%s %s %s-%s>" (writing-schedule-iso-date abs) dow start end)))
 
 ;;;; Mapping and org generation
 
@@ -566,7 +610,7 @@ exporter skips it."
       (let ((ltr (plist-get ev :letter)))
         (unless (member ltr order) (push ltr order))
         (puthash ltr (+ (gethash ltr totals 0)
-                        (writing-schedule--minutes
+                        (writing-schedule-minutes-between
                          (plist-get ev :start) (plist-get ev :end)))
                  totals)))
     (setq order (sort order #'string<))
@@ -633,7 +677,7 @@ the week to schedule."
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
   (let* ((table (org-table-to-lisp))
-         (parsed (writing-schedule--parse table))
+         (parsed (writing-schedule-parse-table table))
          (events (plist-get parsed :events))
          (letters (plist-get parsed :letters))
          (legend (plist-get parsed :legend)))
@@ -642,10 +686,10 @@ the week to schedule."
     (unless (writing-schedule--guard-overlaps events)
       (user-error "Aborted because of overlapping time blocks; fix them and retry"))
     (let* ((mapping (writing-schedule--read-mapping letters legend))
-           (monday (writing-schedule--week-monday
+           (monday (writing-schedule-week-monday
                     (org-read-date nil t nil "Week to schedule (any day in it): ")))
            (title (format "Writing Schedule (week of %s)"
-                          (writing-schedule--iso-date monday)))
+                          (writing-schedule-iso-date monday)))
            (body (concat (writing-schedule--build-org events mapping monday title)
                          (writing-schedule--summary events mapping)))
            (default-file (writing-schedule-file-for-week monday))
@@ -668,7 +712,7 @@ the week to schedule."
 (defun writing-schedule--day-title (day-abs)
   "Return the single-day schedule title for DAY-ABS."
   (format "Writing Schedule (%s %s)"
-          (writing-schedule--iso-date day-abs)
+          (writing-schedule-iso-date day-abs)
           (calendar-day-name (calendar-gregorian-from-absolute day-abs))))
 
 (defun writing-schedule--day-events (events monday-abs day-abs)
@@ -694,7 +738,7 @@ for one day."
   (interactive)
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
-  (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+  (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
          (all-events (plist-get parsed :events)))
     (unless all-events
       (user-error "No filled time blocks found in this table"))
@@ -705,7 +749,7 @@ for one day."
            (events (writing-schedule--day-events all-events monday day-abs)))
       (unless events
         (user-error "No filled time blocks for %s"
-                    (writing-schedule--iso-date day-abs)))
+                    (writing-schedule-iso-date day-abs)))
       (unless (writing-schedule--guard-overlaps events)
         (user-error "Aborted because of overlapping time blocks; fix them and retry"))
       (let* ((mapping (writing-schedule--read-mapping
@@ -739,11 +783,11 @@ that clashes with a block in another group for the same day."
   (interactive)
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
-  (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
-         (conflicts (writing-schedule--overlaps (plist-get parsed :events))))
+  (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
+         (conflicts (writing-schedule-overlaps (plist-get parsed :events))))
     (if (null conflicts)
         (message "No overlapping time blocks in this table")
-      (let ((lines (writing-schedule--overlap-lines conflicts)))
+      (let ((lines (writing-schedule-overlap-lines conflicts)))
         (with-current-buffer (get-buffer-create "*writing-schedule overlaps*")
           (let ((inhibit-read-only t))
             (erase-buffer)
@@ -766,7 +810,7 @@ that clashes with a block in another group for the same day."
     "N" "O" "P" "Q" "R" "S" "T" "U" "V" "W" "X" "Y" "Z")
   "Default single-letter project codes for a scaffolded template.")
 
-(defun writing-schedule--template-string (n)
+(defun writing-schedule-template-string (n)
   "Return a blank weekly schedule template for N projects (1 to 26).
 The scaffold uses single-letter codes.  For task codes of your own, such
 as EM or EX, edit the legend rows and the day cells to use them, because
@@ -822,7 +866,7 @@ The scaffold uses single-letter codes.  You can rename the legend rows
 and use your own short uppercase codes, such as EM or EX, in the cells."
   (interactive "nNumber of writing projects (1-26): ")
   (let ((start (point)))
-    (insert (writing-schedule--template-string n))
+    (insert (writing-schedule-template-string n))
     (goto-char start)
     (forward-line 2)
     (when (org-at-table-p) (org-table-align))))
@@ -884,13 +928,13 @@ week that contains it."
   (interactive "P")
   (let ((weeks (writing-schedule--archived-weeks)))
     (if (or pick-date (null weeks))
-        (let* ((monday (writing-schedule--week-monday
+        (let* ((monday (writing-schedule-week-monday
                         (org-read-date nil t nil
                                        "Open the week containing (any day): ")))
                (file (writing-schedule-file-for-week monday)))
           (unless (file-exists-p file)
             (user-error "No schedule archived for the week of %s"
-                        (writing-schedule--iso-date monday)))
+                        (writing-schedule-iso-date monday)))
           (find-file file))
       (let* ((choice (completing-read "Open week (newest first): "
                                       (writing-schedule--ordered-table
@@ -918,12 +962,12 @@ teaching week, a meeting week, or a writing retreat."
     (let* ((choice (completing-read "Start this week from template: "
                                     (sort templates #'string<) nil t))
            (source (expand-file-name choice tdir))
-           (monday (writing-schedule--week-monday (current-time)))
+           (monday (writing-schedule-week-monday (current-time)))
            (dest (writing-schedule-table-file-for-week monday))
            (overwrite (or (not (file-exists-p dest))
                           (y-or-n-p
                            (format "A table for the week of %s exists.  Overwrite it? "
-                                   (writing-schedule--iso-date monday)))))
+                                   (writing-schedule-iso-date monday)))))
            buffer)
       (make-directory (file-name-directory dest) t)
       (when overwrite (copy-file source dest t))
@@ -1046,7 +1090,7 @@ Meant to be called from a shell through Emacs --batch."
       (goto-char (point-min))
       (unless (re-search-forward "^[ \t]*|" nil t)
         (error "No org table found in %s" table))
-      (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+      (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
              (events (plist-get parsed :events)))
         (unless events
           (error "No filled time blocks found in %s" table))
@@ -1054,9 +1098,9 @@ Meant to be called from a shell through Emacs --batch."
         (let* ((mapping (writing-schedule--legend-mapping
                          (plist-get parsed :letters)
                          (plist-get parsed :legend)))
-               (monday (writing-schedule--week-monday (org-read-date nil t week)))
+               (monday (writing-schedule-week-monday (org-read-date nil t week)))
                (title (format "Writing Schedule (week of %s)"
-                              (writing-schedule--iso-date monday)))
+                              (writing-schedule-iso-date monday)))
                (body (concat (writing-schedule--build-org events mapping monday title)
                              (writing-schedule--summary events mapping)))
                (org-file (writing-schedule-file-for-week monday)))
@@ -1089,7 +1133,7 @@ Emacs --batch."
       (goto-char (point-min))
       (unless (re-search-forward "^[ \t]*|" nil t)
         (error "No org table found in %s" table))
-      (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+      (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
              (all-events (plist-get parsed :events)))
         (unless all-events
           (error "No filled time blocks found in %s" table))
@@ -1098,7 +1142,7 @@ Emacs --batch."
                (events (writing-schedule--day-events all-events monday day-abs)))
           (unless events
             (error "No filled time blocks for %s"
-                   (writing-schedule--iso-date day-abs)))
+                   (writing-schedule-iso-date day-abs)))
           (writing-schedule--guard-overlaps events t)
           (let* ((mapping (writing-schedule--legend-mapping
                            (writing-schedule--day-letters events)
@@ -1120,7 +1164,7 @@ Emacs --batch."
 When FILE is non-empty, write the template there, otherwise print it to
 standard output.  Return the template text or the destination path.
 Meant to be called from a shell through Emacs --batch."
-  (let ((text (writing-schedule--template-string n)))
+  (let ((text (writing-schedule-template-string n)))
     (if (and file (not (string-empty-p file)))
         (let ((dest (expand-file-name file)))
           (make-directory (file-name-directory dest) t)
@@ -1385,7 +1429,7 @@ offset, return just that one day, even when the table has no column for
 it, in which case the day carries no blocks and reads as a blank sheet."
   (let* ((events (plist-get parsed :events))
          (columns (plist-get parsed :columns))
-         (marked (writing-schedule--conflicting-identities events))
+         (marked (writing-schedule-conflicting-identities events))
          (key (writing-schedule--timeblock-key
                (plist-get parsed :letters)
                (writing-schedule--effective-legend (plist-get parsed :legend))))
@@ -1397,7 +1441,7 @@ it, in which case the day carries no blocks and reads as a blank sheet."
       (let* ((day-events (seq-filter (lambda (e) (= (plist-get e :offset) off)) events))
              (abs (+ monday-abs off))
              (greg (calendar-gregorian-from-absolute abs))
-             (date-str (format "%s (%s)" (writing-schedule--iso-date abs)
+             (date-str (format "%s (%s)" (writing-schedule-iso-date abs)
                                (calendar-day-name greg)))
              (note (seq-some (lambda (e)
                                (member (writing-schedule--event-identity e) marked))
@@ -1419,16 +1463,16 @@ single day."
          (columns (plist-get parsed :columns))
          (letters (plist-get parsed :letters))
          (legend (writing-schedule--effective-legend (plist-get parsed :legend)))
-         (marked (writing-schedule--conflicting-identities events))
+         (marked (writing-schedule-conflicting-identities events))
          (offsets (if only-off
                       (list only-off)
                     (sort (delete-dups (mapcar #'cdr columns)) #'<))))
     (concat
      (if only-off
          (format "#+TITLE: Time-Block Sheet, %s\n"
-                 (writing-schedule--iso-date (+ monday only-off)))
+                 (writing-schedule-iso-date (+ monday only-off)))
        (format "#+TITLE: Time-Block Sheets, week of %s\n"
-               (writing-schedule--iso-date monday)))
+               (writing-schedule-iso-date monday)))
      "#+LaTeX_HEADER: \\usepackage[margin=0.5in]{geometry}\n"
      "#+OPTIONS: toc:nil\n\n"
      "* Key\n"
@@ -1443,7 +1487,7 @@ single day."
       (lambda (off)
         (let* ((abs (+ monday off))
                (greg (calendar-gregorian-from-absolute abs))
-               (date-str (format "%s (%s)" (writing-schedule--iso-date abs)
+               (date-str (format "%s (%s)" (writing-schedule-iso-date abs)
                                  (calendar-day-name greg)))
                (day-events
                 (sort (seq-filter (lambda (e) (= (plist-get e :offset) off)) events)
@@ -1495,7 +1539,7 @@ that day, ignoring PER-DAY, which is how the day-scoped commands print
 the plan for a single day.  Otherwise the org file is a single week file.
 Return the list of files written."
   (let ((written '())
-        (stamp (writing-schedule--iso-date monday))
+        (stamp (writing-schedule-iso-date monday))
         (only-off (and day-abs (- day-abs monday))))
     (unless (delete-dups (mapcar #'cdr (plist-get parsed :columns)))
       (error "No day columns found in the table"))
@@ -1507,7 +1551,7 @@ Return the list of files written."
         (cond
          (day-abs
           (let ((tex (expand-file-name
-                      (format "sheet-%s.tex" (writing-schedule--iso-date day-abs)) dir)))
+                      (format "sheet-%s.tex" (writing-schedule-iso-date day-abs)) dir)))
             (writing-schedule--write-and-compile
              tex (writing-schedule--timeblock-document key days))
             (push tex written)))
@@ -1526,7 +1570,7 @@ Return the list of files written."
     (when (memq format '(org both))
       (let ((org (expand-file-name
                   (if day-abs
-                      (format "sheet-%s.org" (writing-schedule--iso-date day-abs))
+                      (format "sheet-%s.org" (writing-schedule-iso-date day-abs))
                     (format "sheets-week-%s.org" stamp))
                   dir)))
         (with-temp-file org
@@ -1548,12 +1592,12 @@ when a LaTeX compiler is available."
   (interactive "P")
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
-  (let* ((parsed (writing-schedule--parse (org-table-to-lisp))))
+  (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp))))
     (unless (writing-schedule--guard-overlaps (plist-get parsed :events))
       (user-error "Aborted because of overlapping time blocks; fix them and retry"))
     (let* ((format (intern (completing-read "Output (pdf, org, both): "
                                             '("pdf" "org" "both") nil t nil nil "both")))
-           (monday (writing-schedule--week-monday
+           (monday (writing-schedule-week-monday
                     (org-read-date nil t nil "Week for the sheets (any day in it): ")))
            (files (writing-schedule--timeblock-generate
                    parsed monday per-day (writing-schedule--sheets-directory) format)))
@@ -1574,7 +1618,7 @@ compiler is available."
   (interactive)
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
-  (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+  (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
          (format (intern (completing-read "Output (pdf, org, both): "
                                           '("pdf" "org" "both") nil t nil nil "both")))
          (day-abs (writing-schedule--abs-from-time
@@ -1596,7 +1640,7 @@ compiler is available."
 Non-nil PER-DAY writes one PDF per day, else one for the week.  OUT-DIR
 overrides the sheets directory.  FORMAT is the string \"pdf\", \"org\",
 or \"both\", and defaults to both.  Print the files written and return
-them.  Meant to be called from a shell through emacs --batch."
+them.  Meant to be called from a shell through `emacs --batch'."
   (let ((table (expand-file-name table)))
     (unless (file-readable-p table)
       (error "Cannot read table file: %s" table))
@@ -1606,8 +1650,8 @@ them.  Meant to be called from a shell through emacs --batch."
       (goto-char (point-min))
       (unless (re-search-forward "^[ \t]*|" nil t)
         (error "No org table found in %s" table))
-      (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
-             (monday (writing-schedule--week-monday (org-read-date nil t week)))
+      (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
+             (monday (writing-schedule-week-monday (org-read-date nil t week)))
              (dir (if (and out-dir (not (string-empty-p out-dir)))
                       (expand-file-name out-dir)
                     (writing-schedule--sheets-directory)))
@@ -1626,8 +1670,8 @@ DAY is an ISO date string, or the word \"today\", or an empty string,
 which both mean today.  OUT-DIR overrides the sheets directory.  FORMAT
 is the string \"pdf\", \"org\", or \"both\", and defaults to both.  The
 sheet is named sheet-<ISO>.tex and sheet-<ISO>.org.  Print the files
-written and return them.  Meant to be called from a shell through emacs
---batch."
+written and return them.  Meant to be called from a shell through
+`emacs --batch'."
   (let ((table (expand-file-name table)))
     (unless (file-readable-p table)
       (error "Cannot read table file: %s" table))
@@ -1637,7 +1681,7 @@ written and return them.  Meant to be called from a shell through emacs
       (goto-char (point-min))
       (unless (re-search-forward "^[ \t]*|" nil t)
         (error "No org table found in %s" table))
-      (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+      (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
              (day-abs (writing-schedule--day-abs day))
              (monday (writing-schedule--monday-of-abs day-abs))
              (dir (if (and out-dir (not (string-empty-p out-dir)))
@@ -1657,7 +1701,7 @@ written and return them.  Meant to be called from a shell through emacs
 (defun writing-schedule-batch-check (table)
   "Report overlapping time blocks in TABLE, and return non-nil when any exist.
 Print each clash keyed by weekday.  Meant to be called from a shell
-through emacs --batch, where the shell maps a non-nil return to a
+through `emacs --batch', where the shell maps a non-nil return to a
 non-zero exit."
   (let ((table (expand-file-name table)))
     (unless (file-readable-p table)
@@ -1668,12 +1712,12 @@ non-zero exit."
       (goto-char (point-min))
       (unless (re-search-forward "^[ \t]*|" nil t)
         (error "No org table found in %s" table))
-      (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
-             (conflicts (writing-schedule--overlaps (plist-get parsed :events))))
+      (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
+             (conflicts (writing-schedule-overlaps (plist-get parsed :events))))
         (if (null conflicts)
             (progn (princ (format "No overlapping time blocks in %s\n" table)) nil)
           (princ (format "Overlapping time blocks in %s:\n" table))
-          (dolist (l (writing-schedule--overlap-lines conflicts))
+          (dolist (l (writing-schedule-overlap-lines conflicts))
             (princ (concat "  " l "\n")))
           t)))))
 
@@ -1707,6 +1751,26 @@ The keys are g generate, G generate one day, t template, n new week from
 template, f generate from a saved table, s save table as template,
 b time-block sheets, d time-block sheet for one day, k check overlaps,
 o open week, r open recent, e export ics, and a add to agenda.")
+
+;;;; Obsolete names
+;; These private names were promoted to public ones in 0.3.1.  The old
+;; names keep working for two releases and are planned for removal in
+;; 0.5.0, so code outside this file should move to the public names.
+
+(dolist (pair '((writing-schedule--parse . writing-schedule-parse-table)
+                (writing-schedule--parse-time . writing-schedule-parse-time)
+                (writing-schedule--day-offset . writing-schedule-day-offset)
+                (writing-schedule--minutes . writing-schedule-minutes-between)
+                (writing-schedule--overlaps . writing-schedule-overlaps)
+                (writing-schedule--overlap-lines . writing-schedule-overlap-lines)
+                (writing-schedule--conflicting-identities
+                 . writing-schedule-conflicting-identities)
+                (writing-schedule--template-string
+                 . writing-schedule-template-string)
+                (writing-schedule--week-monday . writing-schedule-week-monday)
+                (writing-schedule--iso-date . writing-schedule-iso-date)))
+  (defalias (car pair) (cdr pair))
+  (make-obsolete (car pair) (cdr pair) "0.3.1"))
 
 (provide 'writing-schedule)
 ;;; writing-schedule.el ends here

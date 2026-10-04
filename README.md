@@ -1,6 +1,6 @@
 # Antifragile time-blocking for deep work
 
-![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.1.0&color=blue)
+![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.3.1&color=blue)
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
 ![Tests](https://img.shields.io/badge/tests-97%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -412,6 +412,32 @@ so all three become sources of TODO items and timed blocks.
 | `writing-schedule-timeblock-sheets`             | Print two-page time-block sheets for the week      |
 | `writing-schedule-timeblock-sheet-for-day`      | Print a two-page time-block sheet for one day, or today |
 
+## Public API for other packages
+
+Version 0.3.1 promotes the table parser and the overlap test to public
+functions, so companion packages such as writing-habit-el can build on them
+without calling private names.
+
+| Function | Returns |
+|----------|---------|
+| `writing-schedule-parse-table` | plist `:events :legend :letters :columns` from `org-table-to-lisp` rows |
+| `writing-schedule-parse-text` | the same plist from a string holding a table |
+| `writing-schedule-table-lines-to-lisp` | `org-table-to-lisp` rows from a string, with no org buffer |
+| `writing-schedule-split-row` | the cells of one table line, trimmed, or padded when RAW is non-nil |
+| `writing-schedule-parse-time` | `("HH:MM" . "HH:MM")` from a time cell, or nil |
+| `writing-schedule-day-offset` | 0 for Monday through 6 for Sunday, or nil |
+| `writing-schedule-minutes-between` | minutes from START to END |
+| `writing-schedule-overlaps` | conflicting pairs, `(:offset :first :second)` |
+| `writing-schedule-overlap-lines` | one readable line per conflict |
+| `writing-schedule-conflicting-identities` | `(offset start end letter section)` of every clashing block |
+| `writing-schedule-template-string` | a blank weekly table for N projects |
+| `writing-schedule-week-monday` | the absolute date of the Monday on or before a time |
+| `writing-schedule-iso-date` | `YYYY-MM-DD` for an absolute date |
+
+An event is a plist with the keys `:section`, `:offset`, `:start`, `:end`, and
+`:letter`. The old double-dash names still work and are marked obsolete. They
+will be removed in 0.5.0, two releases after 0.3.1.
+
 ## Key bindings
 
 The package ships a prefix keymap, `writing-schedule-command-map`, that
@@ -548,7 +574,7 @@ installed through the package manager, the elisp file sits in your package
 directory instead, so point the script at it with `WS_DIR`:
 
 ```
-export WS_DIR=~/.emacs.d/elpa/writing-schedule-0.1.0
+export WS_DIR=~/.emacs.d/elpa/writing-schedule-0.3.1
 ```
 
 Add that line to your shell startup file, meaning `~/.bashrc` or

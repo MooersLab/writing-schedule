@@ -17,7 +17,7 @@
 (require 'calendar)
 (require 'writing-schedule)
 
-;;;; writing-schedule--day-offset
+;;;; writing-schedule-day-offset
 
 (ert-deftest writing-schedule/day-offset/known-abbreviations ()
   "Known day abbreviations map to the correct Monday offset."
@@ -28,62 +28,62 @@
                   ("F" . 4) ("Fr" . 4) ("Fri" . 4)
                   ("Sa" . 5) ("sat" . 5)
                   ("Su" . 6) ("Sun" . 6)))
-    (should (equal (writing-schedule--day-offset (car case)) (cdr case)))))
+    (should (equal (writing-schedule-day-offset (car case)) (cdr case)))))
 
 (ert-deftest writing-schedule/day-offset/trims-whitespace ()
   "Surrounding whitespace does not defeat the lookup."
-  (should (equal (writing-schedule--day-offset "  M  ") 0)))
+  (should (equal (writing-schedule-day-offset "  M  ") 0)))
 
 (ert-deftest writing-schedule/day-offset/rejects-unknown ()
   "Unknown or ambiguous cells return nil."
-  (should-not (writing-schedule--day-offset "X"))
-  (should-not (writing-schedule--day-offset ""))
-  (should-not (writing-schedule--day-offset nil))
+  (should-not (writing-schedule-day-offset "X"))
+  (should-not (writing-schedule-day-offset ""))
+  (should-not (writing-schedule-day-offset nil))
   ;; A lone T is ambiguous between Tuesday and Thursday, so it is excluded.
-  (should-not (writing-schedule--day-offset "T")))
+  (should-not (writing-schedule-day-offset "T")))
 
-;;;; writing-schedule--parse-time
+;;;; writing-schedule-parse-time
 
 (ert-deftest writing-schedule/parse-time/happy-path ()
   "A well formed range returns zero padded start and end strings."
-  (should (equal (writing-schedule--parse-time "04:00-05:30") '("04:00" . "05:30")))
-  (should (equal (writing-schedule--parse-time "20:30-22:00") '("20:30" . "22:00"))))
+  (should (equal (writing-schedule-parse-time "04:00-05:30") '("04:00" . "05:30")))
+  (should (equal (writing-schedule-parse-time "20:30-22:00") '("20:30" . "22:00"))))
 
 (ert-deftest writing-schedule/parse-time/zero-pads-single-digit-hour ()
   "A single digit hour is padded to two digits."
-  (should (equal (writing-schedule--parse-time "9:15 - 10:45") '("09:15" . "10:45")))
-  (should (equal (writing-schedule--parse-time "04:00-5:30") '("04:00" . "05:30"))))
+  (should (equal (writing-schedule-parse-time "9:15 - 10:45") '("09:15" . "10:45")))
+  (should (equal (writing-schedule-parse-time "04:00-5:30") '("04:00" . "05:30"))))
 
 (ert-deftest writing-schedule/parse-time/tolerates-irregular-spacing ()
   "Irregular spacing around the dash is accepted."
-  (should (equal (writing-schedule--parse-time "15:00- 16:30") '("15:00" . "16:30")))
-  (should (equal (writing-schedule--parse-time "11:30 - 13:00") '("11:30" . "13:00"))))
+  (should (equal (writing-schedule-parse-time "15:00- 16:30") '("15:00" . "16:30")))
+  (should (equal (writing-schedule-parse-time "11:30 - 13:00") '("11:30" . "13:00"))))
 
 (ert-deftest writing-schedule/parse-time/rejects-non-times ()
   "Cells that hold no time return nil."
-  (should-not (writing-schedule--parse-time "Generative:"))
-  (should-not (writing-schedule--parse-time ""))
-  (should-not (writing-schedule--parse-time nil)))
+  (should-not (writing-schedule-parse-time "Generative:"))
+  (should-not (writing-schedule-parse-time ""))
+  (should-not (writing-schedule-parse-time nil)))
 
 (ert-deftest writing-schedule/parse-time/tolerates-space-after-colon ()
   "A space after the colon in a time is tolerated, as in 16: 30."
-  (should (equal (writing-schedule--parse-time "15:00-16: 30") '("15:00" . "16:30")))
-  (should (equal (writing-schedule--parse-time "9: 15 - 10:45") '("09:15" . "10:45"))))
+  (should (equal (writing-schedule-parse-time "15:00-16: 30") '("15:00" . "16:30")))
+  (should (equal (writing-schedule-parse-time "9: 15 - 10:45") '("09:15" . "10:45"))))
 
-;;;; writing-schedule--minutes
+;;;; writing-schedule-minutes-between
 
 (ert-deftest writing-schedule/minutes/various-durations ()
   "The minute count matches the elapsed time."
-  (should (= (writing-schedule--minutes "04:00" "05:30") 90))
-  (should (= (writing-schedule--minutes "09:15" "10:45") 90))
-  (should (= (writing-schedule--minutes "04:00" "05:00") 60))
-  (should (= (writing-schedule--minutes "04:00" "04:15") 15)))
+  (should (= (writing-schedule-minutes-between "04:00" "05:30") 90))
+  (should (= (writing-schedule-minutes-between "09:15" "10:45") 90))
+  (should (= (writing-schedule-minutes-between "04:00" "05:00") 60))
+  (should (= (writing-schedule-minutes-between "04:00" "04:15") 15)))
 
 (ert-deftest writing-schedule/minutes/zero-duration ()
   "Equal start and end yield zero minutes."
-  (should (= (writing-schedule--minutes "00:00" "00:00") 0)))
+  (should (= (writing-schedule-minutes-between "00:00" "00:00") 0)))
 
-;;;; writing-schedule--parse
+;;;; writing-schedule-parse-table
 
 (ert-deftest writing-schedule/parse/reads-events-letters-legend ()
   "The parser returns events, sorted letters, and the legend."
@@ -99,7 +99,7 @@
                   ("A:" "Proj Alpha" "" "")
                   ("B:" "Proj Beta" "" "")
                   ("C: Gamma inline" "" "" "")))
-         (parsed (writing-schedule--parse table))
+         (parsed (writing-schedule-parse-table table))
          (events (plist-get parsed :events))
          (letters (plist-get parsed :letters))
          (legend (plist-get parsed :legend)))
@@ -115,7 +115,7 @@
                   hline
                   ("Gen:" "" "" "")
                   ("04:00-05:30" "A" "B" "")))
-         (event (car (plist-get (writing-schedule--parse table) :events))))
+         (event (car (plist-get (writing-schedule-parse-table table) :events))))
     (should (equal (plist-get event :section) "Gen"))
     (should (equal (plist-get event :offset) 0))
     (should (equal (plist-get event :start) "04:00"))
@@ -128,7 +128,7 @@
                   hline
                   ("Gen:" "")
                   ("04:00-05:30" "a")))
-         (event (car (plist-get (writing-schedule--parse table) :events))))
+         (event (car (plist-get (writing-schedule-parse-table table) :events))))
     (should (equal (plist-get event :letter) "A"))))
 
 (ert-deftest writing-schedule/parse/legend-description-in-first-column ()
@@ -140,7 +140,7 @@
                   hline
                   ("A:0211dnph1docking" "")
                   ("B: DUSP1 radiation" "")))
-         (legend (plist-get (writing-schedule--parse table) :legend)))
+         (legend (plist-get (writing-schedule-parse-table table) :legend)))
     (should (equal (cdr (assoc "A" legend)) "0211dnph1docking"))
     (should (equal (cdr (assoc "B" legend)) "DUSP1 radiation"))))
 
@@ -158,7 +158,7 @@
                   ("EX: exercise" "" "" "")
                   ("W: 2026words" "" "" "")
                   ("TT: time tracking" "" "" "")))
-         (parsed (writing-schedule--parse table))
+         (parsed (writing-schedule-parse-table table))
          (legend (plist-get parsed :legend))
          (letters (plist-get parsed :letters)))
     (should (equal letters '("A" "B" "EM" "EX" "TT" "W")))
@@ -175,7 +175,7 @@
                   ("04:00-05:30" "EM")
                   hline
                   ("EM: email" "")))
-         (parsed (writing-schedule--parse table)))
+         (parsed (writing-schedule-parse-table table)))
     (should (equal (cdr (assoc "EM" (plist-get parsed :legend))) "email"))
     (should-not (assoc "GEN" (plist-get parsed :legend)))
     (should (equal (plist-get (car (plist-get parsed :events)) :section) "Gen"))))
@@ -186,15 +186,15 @@
                   hline
                   ("Support" "")
                   ("13:15-14:45" "A")))
-         (event (car (plist-get (writing-schedule--parse table) :events))))
+         (event (car (plist-get (writing-schedule-parse-table table) :events))))
     (should (equal (plist-get event :section) "Support"))))
 
 (ert-deftest writing-schedule/parse/header-only-has-no-events ()
   "A table with only a header row yields no events."
-  (should-not (plist-get (writing-schedule--parse '(("Time" "M" "Tu") hline))
+  (should-not (plist-get (writing-schedule-parse-table '(("Time" "M" "Tu") hline))
                          :events)))
 
-;;;; writing-schedule--week-monday
+;;;; writing-schedule-week-monday
 
 (ert-deftest writing-schedule/week-monday/snaps-any-day-to-monday ()
   "Any day inside a week snaps back to that week's Monday."
@@ -202,7 +202,7 @@
                  "2026-01-20"    ; Tuesday
                  "2026-01-24"    ; Saturday
                  "2026-01-25"))  ; Sunday
-    (let ((monday (writing-schedule--week-monday (org-read-date nil t day))))
+    (let ((monday (writing-schedule-week-monday (org-read-date nil t day))))
       (should (equal (calendar-gregorian-from-absolute monday) '(1 19 2026))))))
 
 ;;;; writing-schedule--week-file-regexp and archived-weeks
@@ -253,11 +253,11 @@
                    '("2026-01-26" "2026-01-19")))
     (should (equal (funcall table "2026-02-02" nil nil) t))))
 
-;;;; writing-schedule--iso-date and writing-schedule-file-for-week
+;;;; writing-schedule-iso-date and writing-schedule-file-for-week
 
 (ert-deftest writing-schedule/iso-date/formats-absolute-date ()
   "An absolute date renders as a zero-padded ISO string."
-  (should (string= (writing-schedule--iso-date
+  (should (string= (writing-schedule-iso-date
                     (calendar-absolute-from-gregorian '(1 19 2026)))
                    "2026-01-19")))
 
@@ -385,19 +385,19 @@ and are used verbatim when set, at call time and in any load order."
 
 (ert-deftest writing-schedule/template-string/builds-n-projects ()
   "The template has a title, a day header, and one legend row per project."
-  (let ((s (writing-schedule--template-string 3)))
+  (let ((s (writing-schedule-template-string 3)))
     (should (string-match-p "#\\+TITLE: Writing Schedule for 3 Projects" s))
     (should (string-match-p "Time <l>" s))
     (should (string-match-p "| A: |" s))
     (should (string-match-p "| C: |" s))
     (should-not (string-match-p "| D: |" s)))
-  (should (string-match-p "for 1 Project\n" (writing-schedule--template-string 0)))
-  (should (string-match-p "for 9 Projects" (writing-schedule--template-string "9")))
-  (should (string-match-p "for 26 Projects" (writing-schedule--template-string 99))))
+  (should (string-match-p "for 1 Project\n" (writing-schedule-template-string 0)))
+  (should (string-match-p "for 9 Projects" (writing-schedule-template-string "9")))
+  (should (string-match-p "for 26 Projects" (writing-schedule-template-string 99))))
 
 (ert-deftest writing-schedule/template-string/more-than-four ()
   "The scaffold can produce more than four single-letter projects."
-  (let ((s (writing-schedule--template-string 6)))
+  (let ((s (writing-schedule-template-string 6)))
     (should (string-match-p "| E: |" s))
     (should (string-match-p "| F: |" s))
     (should-not (string-match-p "| G: |" s))))
@@ -411,7 +411,7 @@ and are used verbatim when set, at call time and in any load order."
     (let* ((table '(("Time <l>" "M")
                     hline
                     ("04:00-05:30" "Z")))
-           (parsed (writing-schedule--parse table))
+           (parsed (writing-schedule-parse-table table))
            (monday (calendar-absolute-from-gregorian '(1 19 2026)))
            (kd (writing-schedule--timeblock-days parsed monday)))
       (should (string-match-p "Z = zebra" (car kd)))))
@@ -454,7 +454,7 @@ and are used verbatim when set, at call time and in any load order."
                   ("04:00-05:30" "A")
                   hline
                   ("A: docking" "")))
-         (parsed (writing-schedule--parse table))
+         (parsed (writing-schedule-parse-table table))
          (monday (calendar-absolute-from-gregorian '(1 19 2026)))
          (kd (writing-schedule--timeblock-days parsed monday))
          (doc (writing-schedule--timeblock-document (car kd) (cdr kd))))
@@ -479,7 +479,7 @@ and are used verbatim when set, at call time and in any load order."
                   hline
                   ("A: docking" "" "")
                   ("EM: email" "" "")))
-         (parsed (writing-schedule--parse table))
+         (parsed (writing-schedule-parse-table table))
          (monday (calendar-absolute-from-gregorian '(1 19 2026)))
          (kd (writing-schedule--timeblock-days parsed monday))
          (doc (writing-schedule--timeblock-document (car kd) (cdr kd))))
@@ -500,7 +500,7 @@ and are used verbatim when set, at call time and in any load order."
                   hline
                   ("A: docking" "" "")
                   ("EM: email" "" "")))
-         (parsed (writing-schedule--parse table))
+         (parsed (writing-schedule-parse-table table))
          (monday (calendar-absolute-from-gregorian '(1 19 2026)))
          (org (writing-schedule--timeblock-org-document parsed monday)))
     (should (string-match-p "#\\+TITLE: Time-Block Sheets, week of 2026-01-19" org))
@@ -520,7 +520,7 @@ and are used verbatim when set, at call time and in any load order."
                   hline
                   ("A: docking" "" "")
                   ("EM: email" "" "")))
-         (parsed (writing-schedule--parse table))
+         (parsed (writing-schedule-parse-table table))
          (monday (calendar-absolute-from-gregorian '(1 19 2026)))
          (org (writing-schedule--timeblock-org-document parsed monday 1)))
     (should (string-match-p "#\\+TITLE: Time-Block Sheet, 2026-01-20" org))
@@ -537,7 +537,7 @@ and are used verbatim when set, at call time and in any load order."
                   hline
                   ("A: docking" "" "")
                   ("EM: email" "" "")))
-         (parsed (writing-schedule--parse table))
+         (parsed (writing-schedule-parse-table table))
          (monday (calendar-absolute-from-gregorian '(1 19 2026)))
          (kd (writing-schedule--timeblock-days parsed monday 1))
          (doc (writing-schedule--timeblock-document (car kd) (cdr kd))))
@@ -550,7 +550,7 @@ and are used verbatim when set, at call time and in any load order."
   (let* ((table '(("Time <l>" "M")
                   hline
                   ("04:00-05:30" "A")))
-         (parsed (writing-schedule--parse table))
+         (parsed (writing-schedule-parse-table table))
          (monday (calendar-absolute-from-gregorian '(1 19 2026)))
          (kd (writing-schedule--timeblock-days parsed monday 6))) ; Sunday
     (should (= (length (cdr kd)) 1))
@@ -615,7 +615,7 @@ and are used verbatim when set, at call time and in any load order."
 
 (ert-deftest writing-schedule/overlaps/same-day-clash ()
   "Two blocks on the same day whose intervals overlap conflict."
-  (let ((conflicts (writing-schedule--overlaps
+  (let ((conflicts (writing-schedule-overlaps
                     (list (ws-test--ev 2 "09:00" "10:30" "B" "Editing")
                           (ws-test--ev 2 "10:00" "11:00" "C" "Support")))))
     (should (= (length conflicts) 1))
@@ -625,19 +625,19 @@ and are used verbatim when set, at call time and in any load order."
 
 (ert-deftest writing-schedule/overlaps/touching-blocks-clean ()
   "Half-open intervals mean touching blocks do not conflict."
-  (should (null (writing-schedule--overlaps
+  (should (null (writing-schedule-overlaps
                  (list (ws-test--ev 0 "04:00" "05:30" "A")
                        (ws-test--ev 0 "05:30" "07:00" "B"))))))
 
 (ert-deftest writing-schedule/overlaps/identical-blocks-clash ()
   "Two identical blocks on the same day conflict."
-  (should (= 1 (length (writing-schedule--overlaps
+  (should (= 1 (length (writing-schedule-overlaps
                         (list (ws-test--ev 0 "09:00" "10:00" "A" "Gen")
                               (ws-test--ev 0 "09:00" "10:00" "B" "Sup")))))))
 
 (ert-deftest writing-schedule/overlaps/three-blocks-pairs ()
   "A long block overlaps two others; the middle two do not overlap."
-  (let* ((conflicts (writing-schedule--overlaps
+  (let* ((conflicts (writing-schedule-overlaps
                      (list (ws-test--ev 2 "09:00" "11:00" "A")
                            (ws-test--ev 2 "09:30" "09:45" "B")
                            (ws-test--ev 2 "10:00" "12:00" "C"))))
@@ -649,30 +649,30 @@ and are used verbatim when set, at call time and in any load order."
 
 (ert-deftest writing-schedule/overlaps/different-days-clean ()
   "Blocks on different days never conflict."
-  (should (null (writing-schedule--overlaps
+  (should (null (writing-schedule-overlaps
                  (list (ws-test--ev 0 "09:00" "10:30" "A")
                        (ws-test--ev 1 "09:00" "10:30" "B"))))))
 
 (ert-deftest writing-schedule/overlaps/overnight-same-day ()
   "An overnight block conflicts with a later block on its own day."
-  (should (= 1 (length (writing-schedule--overlaps
+  (should (= 1 (length (writing-schedule-overlaps
                         (list (ws-test--ev 0 "22:00" "01:00" "A")
                               (ws-test--ev 0 "23:00" "23:30" "B")))))))
 
 (ert-deftest writing-schedule/overlaps/overnight-no-cross-day ()
   "The after-midnight tail does not reach the next day."
-  (should (null (writing-schedule--overlaps
+  (should (null (writing-schedule-overlaps
                  (list (ws-test--ev 0 "22:00" "01:00" "A")
                        (ws-test--ev 1 "00:30" "01:00" "B"))))))
 
 (ert-deftest writing-schedule/overlaps/empty ()
   "No events, no conflicts."
-  (should (null (writing-schedule--overlaps '()))))
+  (should (null (writing-schedule-overlaps '()))))
 
 (ert-deftest writing-schedule/overlap-lines/matches-python-wording ()
   "The formatted line matches the Python port exactly."
-  (let ((lines (writing-schedule--overlap-lines
-                (writing-schedule--overlaps
+  (let ((lines (writing-schedule-overlap-lines
+                (writing-schedule-overlaps
                  (list (ws-test--ev 2 "09:00" "10:30" "B" "Editing")
                        (ws-test--ev 2 "10:00" "11:00" "C" "Support"))))))
     (should (equal lines
@@ -683,7 +683,7 @@ and are used verbatim when set, at call time and in any load order."
   (let* ((a (ws-test--ev 2 "09:00" "10:30" "B" "Editing"))
          (b (ws-test--ev 2 "10:00" "11:00" "C" "Support"))
          (clean (ws-test--ev 2 "13:00" "14:00" "D" "Writing"))
-         (ids (writing-schedule--conflicting-identities (list a b clean))))
+         (ids (writing-schedule-conflicting-identities (list a b clean))))
     (should (member (writing-schedule--event-identity a) ids))
     (should (member (writing-schedule--event-identity b) ids))
     (should-not (member (writing-schedule--event-identity clean) ids))))
@@ -763,6 +763,61 @@ and are used verbatim when set, at call time and in any load order."
                   ("a" . writing-schedule-add-to-agenda)))
     (should (eq (lookup-key writing-schedule-command-map (kbd (car pair)))
                 (cdr pair)))))
+
+;;;; Public API of 0.3.1
+
+(defconst writing-schedule-test--dir
+  (file-name-directory (or load-file-name buffer-file-name default-directory))
+  "Directory of this test file, used to find the parity fixture.")
+
+(ert-deftest writing-schedule/split-row/trims-like-python ()
+  "The default form trims each cell, as `split_row' does in Python."
+  (should (equal (writing-schedule-split-row "| a | b |") '("a" "b")))
+  (should (equal (writing-schedule-split-row "  | A: x |  |\n") '("A: x" "")))
+  (should (equal (writing-schedule-split-row "|  |") '(""))))
+
+(ert-deftest writing-schedule/split-row/raw-keeps-padding ()
+  "The RAW form keeps padding so the line can be rebuilt byte for byte."
+  (let* ((line "| 05:00-06:00 | A  |   |")
+         (cells (writing-schedule-split-row line t)))
+    (should (equal cells '(" 05:00-06:00 " " A  " "   ")))
+    (should (equal (concat "|" (mapconcat #'identity cells "|") "|") line))))
+
+(ert-deftest writing-schedule/table-lines-to-lisp/matches-org ()
+  "The string reader returns the shape of `org-table-to-lisp'."
+  (let* ((text "#+TITLE: t\n\n| Time | M |\n|------+---|\n| 05:00-06:00 | A |\n\nafter\n| x |\n")
+         (rows (writing-schedule-table-lines-to-lisp text)))
+    (should (equal rows '(("Time" "M") hline ("05:00-06:00" "A"))))
+    (should (equal rows
+                   (with-temp-buffer
+                     (insert text)
+                     (org-mode)
+                     (goto-char (point-min))
+                     (search-forward "| Time")
+                     (org-table-to-lisp))))))
+
+(ert-deftest writing-schedule/parse-text/parity-fixture ()
+  "The parity fixture yields 44 events and 12 codes, as in the Python port."
+  (let* ((file (expand-file-name "projects-and-tasks.org" writing-schedule-test--dir))
+         (parsed (writing-schedule-parse-text
+                  (with-temp-buffer (insert-file-contents file) (buffer-string)))))
+    (should (= (length (plist-get parsed :events)) 44))
+    (should (equal (plist-get parsed :letters)
+                   '("A" "B" "CE" "CM" "EM" "EX" "LC" "LP" "RT" "TP" "TT" "W")))))
+
+(ert-deftest writing-schedule/obsolete-names/still-work ()
+  "The private names of 0.1.0 remain callable and are marked obsolete."
+  (with-no-warnings
+    (should (equal (writing-schedule--parse-time "5:00-6:30") '("05:00" . "06:30")))
+    (should (= (writing-schedule--minutes "05:00" "06:30") 90))
+    (should (= (writing-schedule--day-offset "Tu") 1)))
+  (dolist (old '(writing-schedule--parse writing-schedule--overlaps
+                 writing-schedule--overlap-lines
+                 writing-schedule--conflicting-identities
+                 writing-schedule--template-string
+                 writing-schedule--week-monday writing-schedule--iso-date))
+    (should (fboundp old))
+    (should (get old 'byte-obsolete-info))))
 
 (provide 'test-writing-schedule)
 ;;; test-writing-schedule.el ends here

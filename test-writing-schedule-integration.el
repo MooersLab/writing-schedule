@@ -56,7 +56,7 @@
     (org-mode)
     (goto-char (point-min))
     (search-forward "|")
-    (plist-get (writing-schedule--parse (org-table-to-lisp)) :events)))
+    (plist-get (writing-schedule-parse-table (org-table-to-lisp)) :events)))
 
 ;;;; Parsing a live buffer
 
@@ -68,7 +68,7 @@
     (org-mode)
     (goto-char (point-min))
     (search-forward "|")
-    (let ((parsed (writing-schedule--parse (org-table-to-lisp))))
+    (let ((parsed (writing-schedule-parse-table (org-table-to-lisp))))
       (should (= (length (plist-get parsed :events)) 53))
       (should (equal (plist-get parsed :letters) '("A" "B"))))))
 
@@ -273,7 +273,7 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
   :tags '(integration)
   (let* ((dir (make-temp-file "ws-archive" t))
          (writing-schedule-directory dir)
-         (monday (writing-schedule--week-monday (current-time)))
+         (monday (writing-schedule-week-monday (current-time)))
          (file (writing-schedule-file-for-week monday))
          (events (list (list :section "Gen" :offset 0 :start "04:00" :end "05:30" :letter "A")))
          (mapping (list (list :letter "A" :code "1" :desc "Alpha"))))
@@ -325,7 +325,7 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
          (progn
            (dolist (d ,dates)
              (with-temp-file (writing-schedule-file-for-week
-                              (writing-schedule--week-monday (org-read-date nil t d)))
+                              (writing-schedule-week-monday (org-read-date nil t d)))
                (insert "* placeholder\n")))
            ,@body)
        (delete-directory ,dir t))))
@@ -394,7 +394,7 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
          (tabdir (make-temp-file "ws-tables" t))
          (writing-schedule-template-directory tdir)
          (writing-schedule-table-directory tabdir)
-         (monday (writing-schedule--week-monday (current-time)))
+         (monday (writing-schedule-week-monday (current-time)))
          (dest (writing-schedule-table-file-for-week monday)))
     (unwind-protect
         (progn
@@ -430,7 +430,7 @@ that begins 2026-01-19 lands in writing-2026-01-19.org."
          (tabdir (make-temp-file "ws-tables" t))
          (writing-schedule-template-directory tdir)
          (writing-schedule-table-directory tabdir)
-         (monday (writing-schedule--week-monday (current-time)))
+         (monday (writing-schedule-week-monday (current-time)))
          (dest (writing-schedule-table-file-for-week monday)))
     (unwind-protect
         (progn
@@ -967,7 +967,7 @@ newline is still saved with one."
           (insert writing-schedule-test--clash)
           (org-mode)
           (goto-char (point-min))
-          (let* ((parsed (writing-schedule--parse (org-table-to-lisp)))
+          (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
                  (monday (calendar-absolute-from-gregorian '(1 19 2026)))
                  (files (writing-schedule--timeblock-generate
                          parsed monday nil out-dir 'org monday))
