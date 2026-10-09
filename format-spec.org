@@ -102,7 +102,8 @@ implementation's behavior here is incidental rather than designed.
 A row is a time-block row when day columns have already been found and
 the first cell contains a time range. For each day column, a non-empty
 cell produces one event. The cell text is upper-cased and becomes the
-event code.
+event code, unless it begins with an activity letter, as the section
+on activity letters below describes.
 
 An event carries five fields.
 
@@ -111,11 +112,11 @@ An event carries five fields.
 #+NAME: tab:event
 | Field   | Meaning                                             |
 |---------+-----------------------------------------------------|
-| section | The most recent section header, or =Writing=        |
+| section | The resolved activity section (see below)           |
 | offset  | Days from Monday, taken from the day column         |
 | start   | Start time, zero-padded =HH:MM=                     |
 | end     | End time, zero-padded =HH:MM=                       |
-| letter  | The upper-cased code from the cell                  |
+| letter  | The upper-cased code, without any activity letter   |
 
 Events are returned in the order they are read, meaning row by row and,
 within a row, in column order. Any implementation that reorders events
@@ -137,6 +138,51 @@ and become an org category.
 
 Before any section header appears, the section is =Writing=. This default
 is *required*, because it appears in generated output.
+
+** Activity letters in the cells
+
+A day cell may carry the activity of its block as one lowercase letter
+before the code. The cell matches this pattern, tested case-sensitively:
+
+: ^([ges])([A-Z][A-Z0-9]{0,3})$
+
+The letter names the event's section, and the second group is the code.
+
+#+CAPTION: The section each activity letter names.
+#+ATTR_LATEX: :booktabs t
+| Letter | Section    |
+|--------+------------|
+| g      | Generative |
+| e      | Rewriting  |
+| s      | Supporting |
+
+A cell that does not match is upper-cased whole, so a cell typed all in
+lowercase, such as =ga=, is the code =GA=. A table whose cells carry
+letters needs no section rows.
+
+** Default activities in the legend
+
+A legend description may contain a tag that names the code's default
+activity, matched case-insensitively:
+
+: (^|\s)@(generative|editing|support)\b
+
+The first tag is removed from the description. Its activity maps to
+=Generative=, =Rewriting=, or =Supporting=. When a code is defined twice,
+the first definition supplies the default.
+
+** Resolving the section of an event
+
+The section of an event comes from the first of these that is present.
+
+1. An activity letter in the cell.
+2. A default activity on the code's legend entry.
+3. The most recent section header.
+4. =Writing=, before any section header.
+
+The legend usually sits below the grid, so an implementation resolves the
+sections after it has read every row. A table without letters or tags
+yields exactly the events it yielded before these rules existed.
 
 ** Time parsing tolerances
 

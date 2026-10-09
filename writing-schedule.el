@@ -3,7 +3,7 @@
 ;; Author: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Assisted-by: Claude Code:claude-opus-4-8
 ;; Maintainer: Blaine Mooers <blaine-mooers@ou.edu>
-;; Version: 0.3.1
+;; Version: 0.4.0
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: calendar, outlines, convenience
 ;; URL: https://github.com/MooersLab/writing-schedule
@@ -194,6 +194,20 @@ Each element is a list whose head is a section name and whose tail
 is a list of time ranges written as HH:MM-HH:MM."
   :type '(alist :key-type string :value-type (repeat string)))
 
+(defcustom writing-schedule-starter-slots
+  '(("morning" ("Generative" "05:30-07:30") ("Rewriting" "09:00-10:30")
+     ("Supporting" "13:00-14:00"))
+    ("evening" ("Supporting" "12:15-13:00") ("Rewriting" "17:30-19:00")
+     ("Generative" "21:00-23:30"))
+    ("split" ("Generative" "06:00-07:30") ("Supporting" "12:30-13:15")
+     ("Rewriting" "19:30-21:00")))
+  "Small starter days for a new writer, keyed by the time of day that suits them.
+Each value has the shape of `writing-schedule-default-slots'.  The
+sections follow the order of the day, so an evening writer's Generative
+section comes last."
+  :type '(alist :key-type string
+                :value-type (alist :key-type string :value-type (repeat string))))
+
 ;;;; Low-level parsing helpers
 
 (defconst writing-schedule--time-regexp
@@ -345,6 +359,54 @@ lines are printed with `princ'; the error action still signals."
            (format "Overlapping time blocks found:\n%s\nWrite anyway? "
                    joined))))))))
 
+(defconst writing-schedule--cell-regexp
+  "\\`\\([ges]\\)\\([A-Z][A-Z0-9]\\{0,3\\}\\)\\'"
+  "A day cell with an activity letter before the code, such as gA or sEM.
+The letter counts only when it is lowercase and the code starts with a
+capital, so a cell typed all in lowercase, such as \"ga\", is the code GA.
+Match with `case-fold-search' bound to nil.")
+
+(defconst writing-schedule-activity-sections
+  '(("g" . "Generative") ("e" . "Rewriting") ("s" . "Supporting"))
+  "The section name each activity letter of a day cell stands for.")
+
+(defconst writing-schedule--legend-activity-regexp
+  "\\(?:\\`\\|[ \t]\\)@\\(generative\\|editing\\|support\\)\\b"
+  "A default activity tag in a legend description, such as @support.")
+
+(defconst writing-schedule-legend-activity-sections
+  '(("generative" . "Generative") ("editing" . "Rewriting") ("support" . "Supporting"))
+  "The section name each legend default activity stands for.")
+
+(defun writing-schedule-split-cell (cell)
+  "Return (ACTIVITY . CODE) for the day CELL.
+ACTIVITY is \"g\", \"e\", or \"s\" for a cell such as gA, and nil
+otherwise.  A cell without a prefix is upper-cased whole."
+  (let ((text (string-trim (or cell "")))
+        (case-fold-search nil))
+    (if (string-match writing-schedule--cell-regexp text)
+        (cons (match-string 1 text) (match-string 2 text))
+      (cons nil (upcase text)))))
+
+(defun writing-schedule-event-label (event)
+  "Return the code of EVENT as written in its cell, such as gQ or EM.
+The lowercase activity letter is kept, so the sheets print what the
+writer typed rather than the upper-cased code alone."
+  (concat (or (plist-get event :activity) "") (plist-get event :letter)))
+
+(defun writing-schedule-split-legend-activity (desc)
+  "Return (DESCRIPTION . ACTIVITY) for the legend description DESC.
+The first tag such as @support is removed from DESCRIPTION, and
+ACTIVITY is its word in lowercase, or nil when DESC has no tag."
+  (let ((case-fold-search t)
+        (desc (or desc "")))
+    (if (string-match writing-schedule--legend-activity-regexp desc)
+        (let* ((activity (downcase (match-string 1 desc)))
+               (rest (string-trim (concat (substring desc 0 (match-beginning 0))
+                                          (substring desc (match-end 0))))))
+          (cons (replace-regexp-in-string "[ \t]\\{2,\\}" " " rest) activity))
+      (cons desc nil))))
+
 (defun writing-schedule-parse-table (table)
   "Parse TABLE from `org-table-to-lisp' into a plist.
 The plist keys are :events, :legend, :letters, and :columns.
@@ -352,8 +414,9 @@ An event is a plist with keys :section, :offset, :start, :end,
 and :letter."
   (let ((columns nil)                   ; alist of (col-index . day-offset)
         (section nil)
-        (events '())
+        (pending '())                   ; (header prefix offset start end code)
         (legend '())
+        (defaults '())                  ; alist of (code . section), first wins
         (letters '()))
     (dolist (row table)
       (unless (eq row 'hline)
@@ -381,6 +444,12 @@ and :letter."
                   (desc (string-trim (match-string 2 label))))
               (when (string-empty-p desc)
                 (setq desc (string-trim (mapconcat #'identity (cdr cells) " "))))
+              (let ((split (writing-schedule-split-legend-activity desc)))
+                (setq desc (car split))
+                (unless (assoc ltr legend)
+                  (push (cons ltr (cdr (assoc (cdr split)
+                                              writing-schedule-legend-activity-sections)))
+                        defaults)))
               (push (cons ltr desc) legend)))
            ;; Time-block row.
            ((and columns (writing-schedule-parse-time label))
@@ -388,13 +457,11 @@ and :letter."
               (dolist (col columns)
                 (let ((cell (nth (car col) cells)))
                   (when (and cell (not (string-empty-p cell)))
-                    (let ((ltr (upcase cell)))
-                      (push (list :section (or section "Writing")
-                                  :offset (cdr col)
-                                  :start (car range)
-                                  :end (cdr range)
-                                  :letter ltr)
-                            events)
+                    (let* ((split (writing-schedule-split-cell cell))
+                           (ltr (cdr split)))
+                      (push (list section (car split)
+                                  (cdr col) (car range) (cdr range) ltr)
+                            pending)
                       (cl-pushnew ltr letters :test #'equal)))))))
            ;; Section header.  A word or words, no time, non-empty.
            ((and (not (string-empty-p label))
@@ -402,7 +469,19 @@ and :letter."
                  (not (writing-schedule-parse-time label)))
             (setq section (string-trim (replace-regexp-in-string ":" "" label))))
            (t nil)))))
-    (list :events (nreverse events)
+    ;; The activity of a block comes from the first of these that is
+    ;; present: a prefix in the cell, a default on the code's legend entry,
+    ;; the section header above the row, and finally "Writing".  The legend
+    ;; usually sits below the grid, so the defaults apply once every row is read.
+    (list :events (mapcar (lambda (p)
+                            (pcase-let ((`(,header ,activity ,off ,start ,end ,ltr) p))
+                              (list :section (or (cdr (assoc activity
+                                                             writing-schedule-activity-sections))
+                                                 (cdr (assoc ltr defaults))
+                                                 header "Writing")
+                                    :offset off :start start :end end :letter ltr
+                                    :activity activity)))
+                          (nreverse pending))
           :legend (nreverse legend)
           :letters (sort letters #'string<)
           :columns columns)))
@@ -839,14 +918,22 @@ that clashes with a block in another group for the same day."
     "N" "O" "P" "Q" "R" "S" "T" "U" "V" "W" "X" "Y" "Z")
   "Default single-letter project codes for a scaffolded template.")
 
-(defun writing-schedule-template-string (n)
+(defun writing-schedule-template-string (n &optional style)
   "Return a blank weekly schedule template for N projects (1 to 26).
-The scaffold uses single-letter codes.  For task codes of your own, such
-as EM or EX, edit the legend rows and the day cells to use them, because
-any short uppercase code is accepted."
+STYLE is nil or \"standard\" for the full nine-block day, or a key of
+`writing-schedule-starter-slots' such as \"morning\", \"evening\", or
+\"split\" for a three-block starter day.  The scaffold uses single-letter
+codes.  For task codes of your own, such as EM or EX, edit the legend
+rows and the day cells to use them, because any short uppercase code is
+accepted."
   (setq n (max 1 (min (length writing-schedule--project-letters)
                       (if (stringp n) (string-to-number n) n))))
-  (let* ((days '("M" "Tu" "W" "Th" "F" "Sa"))
+  (let* ((slots (if (member style '(nil "" "standard"))
+                    writing-schedule-default-slots
+                  (or (cdr (assoc style writing-schedule-starter-slots))
+                      (error "Unknown template style %s; choose standard or %s" style
+                             (mapconcat #'car writing-schedule-starter-slots ", ")))))
+         (days '("M" "Tu" "W" "Th" "F" "Sa"))
          (nd (length days))
          (letters (seq-take writing-schedule--project-letters n)))
     (concat
@@ -859,7 +946,7 @@ any short uppercase code is accepted."
                 (mapconcat (lambda (slot) (writing-schedule--blank-row slot nd))
                            (cdr sec) "")
                 "|-\n"))
-      writing-schedule-default-slots "")
+      slots "")
      (mapconcat (lambda (ltr) (writing-schedule--blank-row (concat ltr ":") nd))
                 letters "")
      "|-\n")))
@@ -889,13 +976,20 @@ Return DEST."
   dest)
 
 ;;;###autoload
-(defun writing-schedule-insert-template (n)
+(defun writing-schedule-insert-template (n &optional style)
   "Insert a blank weekly schedule table for N projects (1 to 26).
-The scaffold uses single-letter codes.  You can rename the legend rows
-and use your own short uppercase codes, such as EM or EX, in the cells."
-  (interactive "nNumber of writing projects (1-26): ")
+With a prefix argument, also ask for STYLE, the full standard day or a
+three-block starter day from `writing-schedule-starter-slots'.  The
+scaffold uses single-letter codes.  You can rename the legend rows and
+use your own short uppercase codes, such as EM or EX, in the cells."
+  (interactive
+   (list (read-number "Number of writing projects (1-26): ")
+         (when current-prefix-arg
+           (completing-read "Template style: "
+                            (cons "standard" (mapcar #'car writing-schedule-starter-slots))
+                            nil t nil nil "standard"))))
   (let ((start (point)))
-    (insert (writing-schedule-template-string n))
+    (insert (writing-schedule-template-string n style))
     (goto-char start)
     (forward-line 2)
     (when (org-at-table-p) (org-table-align))))
@@ -1188,12 +1282,13 @@ Emacs --batch."
               ics)))))))
 
 ;;;###autoload
-(defun writing-schedule-batch-insert-template (n &optional file)
+(defun writing-schedule-batch-insert-template (n &optional file style)
   "Write or print a blank template for N projects.
 When FILE is non-empty, write the template there, otherwise print it to
-standard output.  Return the template text or the destination path.
-Meant to be called from a shell through Emacs --batch."
-  (let ((text (writing-schedule-template-string n)))
+standard output.  STYLE picks a starter day, as in
+`writing-schedule-template-string'.  Return the template text or the
+destination path.  Meant to be called from a shell through Emacs --batch."
+  (let ((text (writing-schedule-template-string n style)))
     (if (and file (not (string-empty-p file)))
         (let ((dest (expand-file-name file)))
           (make-directory (file-name-directory dest) t)
@@ -1350,7 +1445,7 @@ printed sheet."
              (star (if (member (writing-schedule--event-identity ev) marked)
                        "$^{*}$" ""))
              (label (format "%s\\quad %s-%s%s"
-                            (plist-get ev :letter)
+                            (writing-schedule-event-label ev)
                             (writing-schedule--hhmm-tidy (plist-get ev :start))
                             (writing-schedule--hhmm-tidy (plist-get ev :end))
                             star)))
@@ -1534,7 +1629,7 @@ single day."
                           (writing-schedule--hhmm-tidy (plist-get e :end))
                           (if (member (writing-schedule--event-identity e) marked)
                               "*" "")
-                          (plist-get e :letter)
+                          (writing-schedule-event-label e)
                           (or (cdr (assoc (plist-get e :letter) legend)) "")))
                 day-events "\n")
              "| | | | |")

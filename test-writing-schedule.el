@@ -819,5 +819,128 @@ and are used verbatim when set, at call time and in any load order."
     (should (fboundp old))
     (should (get old 'byte-obsolete-info))))
 
+;;;; Activity letters in cells, legend defaults, and starter days
+
+(defconst test-writing-schedule--free
+  (concat "| Time        | M  | Tu | W  |\n"
+          "|-------------+----+----+----|\n"
+          "| 12:15-13:00 | sE | E  | sE |\n"
+          "| 17:30-19:00 | eB | eA |    |\n"
+          "| 21:00-23:30 | gA | gB | ga |\n"
+          "|-------------+----+----+----|\n"
+          "| A: DNPH1 docking :safe: |  |  |  |\n"
+          "| B: DUSP1 radiation |  |  |  |\n"
+          "| E: email @support |  |  |  |\n")
+  "A week with activity letters in the cells and no section headers.")
+
+(defconst test-writing-schedule--sectioned
+  (concat "| Time        | M  | Tu |\n"
+          "|-------------+----+----|\n"
+          "| Generative: |    |    |\n"
+          "| 04:00-05:30 | A  | eA |\n"
+          "| 05:45-07:15 | T  | B  |\n"
+          "|-------------+----+----|\n"
+          "| A: one |  |  |\n"
+          "| B: two |  |  |\n"
+          "| T: teaching @support |  |  |\n"
+          "| T: teaching again @editing |  |  |\n")
+  "A sectioned week where a prefix and a legend default override the header.")
+
+(defun test-writing-schedule--sections (text)
+  "Return an alist of ((OFFSET START LETTER) . SECTION) for TEXT."
+  (mapcar (lambda (e) (cons (list (plist-get e :offset) (plist-get e :start)
+                                  (plist-get e :letter))
+                            (plist-get e :section)))
+          (plist-get (writing-schedule-parse-text text) :events)))
+
+(ert-deftest writing-schedule/split-cell ()
+  "A lowercase g, e, or s before a capital is an activity letter."
+  (dolist (case '(("gA" "g" . "A") ("eEM" "e" . "EM") ("sW2" "s" . "W2")
+                  ("A" nil . "A") ("ga" nil . "GA") ("gem" nil . "GEM")
+                  (" sE " "s" . "E") ("xA" nil . "XA") ("" nil . "")))
+    (should (equal (writing-schedule-split-cell (car case)) (cdr case)))))
+
+(ert-deftest writing-schedule/split-legend-activity ()
+  "The first @tag is removed and returned in lowercase."
+  (dolist (case '(("email @support" "email" . "support")
+                  ("@editing paper" "paper" . "editing")
+                  ("paper @Generative :safe:" "paper :safe:" . "generative")
+                  ("me@support.org" "me@support.org")
+                  ("plain" "plain")))
+    (should (equal (writing-schedule-split-legend-activity (car case)) (cdr case)))))
+
+(ert-deftest writing-schedule/parse/prefix-names-the-activity ()
+  "A prefix gives the section, and the code is kept without it."
+  (let ((by (test-writing-schedule--sections test-writing-schedule--free)))
+    (should (equal (cdr (assoc '(0 "12:15" "E") by)) "Supporting"))
+    (should (equal (cdr (assoc '(0 "17:30" "B") by)) "Rewriting"))
+    (should (equal (cdr (assoc '(0 "21:00" "A") by)) "Generative"))
+    (should (equal (cdr (assoc '(1 "12:15" "E") by)) "Supporting"))
+    (should (equal (cdr (assoc '(2 "21:00" "GA") by)) "Writing"))
+    (should (equal (plist-get (writing-schedule-parse-text test-writing-schedule--free)
+                              :letters)
+                   '("A" "B" "E" "GA")))))
+
+(ert-deftest writing-schedule/parse/legend-tag-is-stripped ()
+  "The @tag leaves the description."
+  (let ((legend (plist-get (writing-schedule-parse-text test-writing-schedule--free)
+                           :legend)))
+    (should (equal (cdr (assoc "E" legend)) "email"))
+    (should (equal (cdr (assoc "A" legend)) "DNPH1 docking :safe:"))))
+
+(ert-deftest writing-schedule/parse/prefix-then-default-then-header ()
+  "The prefix beats the legend default, which beats the header."
+  (let ((by (test-writing-schedule--sections test-writing-schedule--sectioned)))
+    (should (equal (cdr (assoc '(0 "04:00" "A") by)) "Generative"))
+    (should (equal (cdr (assoc '(1 "04:00" "A") by)) "Rewriting"))
+    (should (equal (cdr (assoc '(0 "05:45" "T") by)) "Supporting"))))
+
+(ert-deftest writing-schedule/template/standard-is-unchanged ()
+  "The standard style is the old scaffold."
+  (should (equal (writing-schedule-template-string 3)
+                 (writing-schedule-template-string 3 "standard"))))
+
+(ert-deftest writing-schedule/template/starter-days ()
+  "Each starter day has three blocks in the order of the day."
+  (dolist (case '(("morning" "05:30-07:30" "Generative" "Rewriting" "Supporting")
+                  ("evening" "12:15-13:00" "Supporting" "Rewriting" "Generative")
+                  ("split" "06:00-07:30" "Generative" "Supporting" "Rewriting")))
+    (let* ((text (writing-schedule-template-string 2 (car case)))
+           (lines (split-string text "\n"))
+           (blocks (seq-filter (lambda (l) (string-match-p "\\`| [0-9]" l)) lines))
+           (headers (delq nil (mapcar (lambda (l)
+                                        (when (string-match "\\`| \\([A-Z][a-z]+\\):" l)
+                                          (match-string 1 l)))
+                                      lines))))
+      (should (= (length blocks) 3))
+      (should (string-prefix-p (concat "| " (nth 1 case)) (car blocks)))
+      (should (equal headers (nthcdr 2 case))))))
+
+(ert-deftest writing-schedule/template/unknown-style ()
+  "An unknown style is an error."
+  (should-error (writing-schedule-template-string 2 "noon")))
+
+(ert-deftest writing-schedule/parse/event-keeps-activity-letter ()
+  "An event keeps the cell's activity letter for the sheets."
+  (let ((labels (mapcar (lambda (e) (cons (list (plist-get e :offset) (plist-get e :start))
+                                          (writing-schedule-event-label e)))
+                        (plist-get (writing-schedule-parse-text test-writing-schedule--free)
+                                   :events))))
+    (should (equal (cdr (assoc '(0 "21:00") labels)) "gA"))
+    (should (equal (cdr (assoc '(0 "17:30") labels)) "eB"))
+    (should (equal (cdr (assoc '(1 "12:15") labels)) "E"))
+    (should (equal (cdr (assoc '(2 "21:00") labels)) "GA"))))
+
+(ert-deftest writing-schedule/timeblock-spans/print-the-activity-letter ()
+  "The sheet labels keep the lowercase activity letter."
+  (let ((labels (mapcar (lambda (span) (car (split-string (nth 2 span) "\\\\quad")))
+                        (writing-schedule--timeblock-spans
+                         (plist-get (writing-schedule-parse-text test-writing-schedule--free)
+                                    :events)))))
+    (should (member "gA" labels))
+    (should (member "sE" labels))
+    (should (member "GA" labels))
+    (should-not (member "GQ" labels))))
+
 (provide 'test-writing-schedule)
 ;;; test-writing-schedule.el ends here

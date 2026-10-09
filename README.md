@@ -157,7 +157,10 @@ M-x writing-schedule-insert-template
 
 Answer the prompt with the number of projects for the week. A blank
 table appears with the default time blocks and one legend row per
-project.
+project. With a prefix argument, `C-u M-x writing-schedule-insert-template`
+also asks for the shape of the day. Besides the standard nine blocks, it
+offers three-block starter days for a morning writer, an evening writer,
+and a split day, set by `writing-schedule-starter-slots`.
 
 ### 2. Fill the table
 
@@ -190,6 +193,15 @@ with recurring tasks, for example `EM` for email, `EX` for exercise, or
 capitalized word such as `Generative` is read as a section header rather
 than a code. See `examples/projects-and-tasks.org` for a week that mixes
 projects and two-letter task codes.
+
+A cell may also name the activity of its block with one lowercase letter
+before the code. `gA` is generative writing on A, `eA` is editing on A, and
+`sEM` is support work on email. The letter decides the section of that
+block, so a table with letters in its cells needs no section rows, and one
+time slot can hold different activities on different days. A legend entry
+may name a default activity with a tag, as in `EM: email @support`, so a
+bare `EM` counts as support. The letter wins over the tag, and the tag wins
+over the section header. See `format-spec.org` for the exact rule.
 
 ### 3. Generate the schedule
 
