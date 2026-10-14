@@ -3,7 +3,7 @@
 ;; Author: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Assisted-by: Claude Code:claude-opus-4-8
 ;; Maintainer: Blaine Mooers <blaine-mooers@ou.edu>
-;; Version: 0.4.0
+;; Version: 0.5.0
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: calendar, outlines, convenience
 ;; URL: https://github.com/MooersLab/writing-schedule
@@ -210,6 +210,12 @@ section comes last."
 
 ;;;; Low-level parsing helpers
 
+(defconst writing-schedule-code-regexp
+  "\\(?:[A-Z][A-Z0-9]\\{0,3\\}\\|[0-9]\\)"
+  "A project code: a capital and up to three capitals or digits, or one digit.
+The digits 0 to 9 give ten more one-character codes, which a table file
+name can carry.  Match with `case-fold-search' bound to nil.")
+
 (defconst writing-schedule--time-regexp
   "\\([0-9]\\{1,2\\}\\):[ \t]*\\([0-9]\\{2\\}\\)[ \t]*-+[ \t]*\\([0-9]\\{1,2\\}\\):[ \t]*\\([0-9]\\{2\\}\\)"
   "Match a start time and an end time inside a table label cell.
@@ -360,10 +366,11 @@ lines are printed with `princ'; the error action still signals."
                    joined))))))))
 
 (defconst writing-schedule--cell-regexp
-  "\\`\\([ges]\\)\\([A-Z][A-Z0-9]\\{0,3\\}\\)\\'"
-  "A day cell with an activity letter before the code, such as gA or sEM.
+  (concat "\\`\\([ges]\\)\\(" writing-schedule-code-regexp "\\)\\'")
+  "A day cell with an activity letter before the code, such as gA, sEM, or g3.
 The letter counts only when it is lowercase and the code starts with a
-capital, so a cell typed all in lowercase, such as \"ga\", is the code GA.
+capital or is a digit, so a cell typed all in lowercase, such as \"ga\", is
+the code GA.
 Match with `case-fold-search' bound to nil.")
 
 (defconst writing-schedule-activity-sections
@@ -434,12 +441,17 @@ and :letter."
                 (setq i (1+ i))))
             (setq columns (nreverse columns)))
            ;; Legend row.  A short uppercase code (one letter, then up to
-           ;; three more letters or digits), then a colon.  The match is
-           ;; case-sensitive, so an uppercase code such as A, EM, or W2 is
-           ;; a legend row, while a capitalized section header such as
-           ;; Generative is not.
+           ;; three more letters or digits) or a single digit, then a colon.
+           ;; The match is case-sensitive, so an uppercase code such as A,
+           ;; EM, W2, or 3 is a legend row, while a capitalized section
+           ;; header such as Generative is not.  A label such as 5:00-06:30
+           ;; is a time, not the legend row of code 5.
            ((let ((case-fold-search nil))
-              (string-match "\\`\\([A-Z][A-Z0-9]\\{0,3\\}\\)[ \t]*:\\(.*\\)\\'" label))
+              (and (string-match (concat "\\`\\(" writing-schedule-code-regexp
+                                         "\\)[ \t]*:\\(.*\\)\\'")
+                                 label)
+                   (not (and (string-match-p "\\`[0-9]\\'" (match-string 1 label))
+                             (save-match-data (writing-schedule-parse-time label))))))
             (let ((ltr (upcase (match-string 1 label)))
                   (desc (string-trim (match-string 2 label))))
               (when (string-empty-p desc)

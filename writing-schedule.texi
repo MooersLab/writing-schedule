@@ -116,6 +116,12 @@ your daily words. Uppercase is what marks a code, because a capitalized
 word such as @samp{Generative} is read as a section header. See
 @file{examples/projects-and-tasks.org} for a mixed example.
 
+A single digit from @samp{0} to @samp{9} is a code too, as in
+@samp{3: 0374qflip} in the legend and @samp{g3} in a cell. The digits
+give ten more one-character codes after the 26 letters. A label such as
+@samp{5:00-06:30} is still read as a time, not as the legend row of
+code @samp{5}.
+
 @example
 | Time <l>    | M | Tu | W | Th | F | Sa |
 |-------------+---+----+---+----+---+----|

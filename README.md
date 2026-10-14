@@ -194,6 +194,12 @@ capitalized word such as `Generative` is read as a section header rather
 than a code. See `examples/projects-and-tasks.org` for a week that mixes
 projects and two-letter task codes.
 
+A single digit, `0` to `9`, is also a code, which gives ten more
+one-character projects after the 26 letters. A digit names a project in
+a day cell, as in `g3`, and in a legend row, as in `3: 0374qflip`. A
+legend row whose label reads as a time, such as `5:00-06:30`, stays a
+time block and is never read as project 5.
+
 A cell may also name the activity of its block with one lowercase letter
 before the code. `gA` is generative writing on A, `eA` is editing on A, and
 `sEM` is support work on email. The letter decides the section of that

@@ -860,6 +860,37 @@ and are used verbatim when set, at call time and in any load order."
                   (" sE " "s" . "E") ("xA" nil . "XA") ("" nil . "")))
     (should (equal (writing-schedule-split-cell (car case)) (cdr case)))))
 
+;;;; Digit codes
+
+(defconst test-writing-schedule--digits
+  (concat "| Time        | M  | Tu |\n"
+          "|-------------+----+----|\n"
+          "| 5:00-06:30  | g3 | A  |\n"
+          "| 06:45-08:00 | 3  | e0 |\n"
+          "|-------------+----+----|\n"
+          "| A: 1006AIrxOpt :safe: |  |  |\n"
+          "| 3: 0374qflip @editing  |  |  |\n"
+          "| 0: 2026words           |  |  |\n")
+  "A table whose codes include the digits 3 and 0.")
+
+(ert-deftest writing-schedule/digits/cells-and-legend ()
+  "A single digit is a code in a cell, after a prefix, and in the legend."
+  (should (equal (writing-schedule-split-cell "g3") '("g" . "3")))
+  (should (equal (writing-schedule-split-cell "7") '(nil . "7")))
+  (let ((parsed (writing-schedule-parse-text test-writing-schedule--digits))
+        (by (test-writing-schedule--sections test-writing-schedule--digits)))
+    (should (equal (mapcar #'car (plist-get parsed :legend)) '("A" "3" "0")))
+    (should (equal (plist-get parsed :letters) '("0" "3" "A")))
+    (should (equal (cdr (assoc '(0 "05:00" "3") by)) "Generative"))
+    (should (equal (cdr (assoc '(0 "06:45" "3") by)) "Rewriting"))
+    (should (equal (cdr (assoc '(1 "06:45" "0") by)) "Rewriting"))))
+
+(ert-deftest writing-schedule/digits/one-digit-hour-is-a-time ()
+  "A label such as 5:00-06:30 is a time block, not the legend row of 5."
+  (let ((parsed (writing-schedule-parse-text test-writing-schedule--digits)))
+    (should-not (assoc "5" (plist-get parsed :legend)))
+    (should (= (length (plist-get parsed :events)) 4))))
+
 (ert-deftest writing-schedule/split-legend-activity ()
   "The first @tag is removed and returned in lowercase."
   (dolist (case '(("email @support" "email" . "support")
