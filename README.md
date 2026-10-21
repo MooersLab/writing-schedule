@@ -1,6 +1,6 @@
 # Antifragile time-blocking for deep work
 
-![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.3.1&color=blue)
+![Version](https://img.shields.io/static/v1?label=writing-schedule&message=0.6.0&color=blue)
 ![Emacs](https://img.shields.io/badge/Emacs-27.1%2B-7F5AB6)
 ![Tests](https://img.shields.io/badge/tests-97%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
@@ -208,6 +208,21 @@ time slot can hold different activities on different days. A legend entry
 may name a default activity with a tag, as in `EM: email @support`, so a
 bare `EM` counts as support. The letter wins over the tag, and the tag wins
 over the section header. See `format-spec.org` for the exact rule.
+
+Version 0.6.0 also reads a legend kept as its own table in columns. When
+the week grid has no legend rows, the table named `This week` supplies
+them:
+
+```org
+#+NAME: This week
+| Code | Project Number | Project Name | Deadline   | Risk tag | Default activity |
+|------+----------------+--------------+------------+----------+------------------|
+| B:   | 1006           | AIrxOpt      | 2026-12-15 | :safe:   | editing          |
+```
+
+Each row reads as the legend row `B: 1006AIrxOpt 2026-12-15 :safe:`, and
+the Default activity column counts as the `@editing` tag. Legend rows in
+the grid itself still win.
 
 ### 3. Generate the schedule
 
@@ -451,7 +466,8 @@ without calling private names.
 | Function | Returns |
 |----------|---------|
 | `writing-schedule-parse-table` | plist `:events :legend :letters :columns` from `org-table-to-lisp` rows |
-| `writing-schedule-parse-text` | the same plist from a string holding a table |
+| `writing-schedule-parse-text` | the same plist from a string holding a table, with the This week legend when the grid has none |
+| `writing-schedule-column-legend` | `((CODE . TEXT) ...)` from the This week table of a string |
 | `writing-schedule-table-lines-to-lisp` | `org-table-to-lisp` rows from a string, with no org buffer |
 | `writing-schedule-split-row` | the cells of one table line, trimmed, or padded when RAW is non-nil |
 | `writing-schedule-parse-time` | `("HH:MM" . "HH:MM")` from a time cell, or nil |

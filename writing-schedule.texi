@@ -133,6 +133,13 @@ code @samp{5}.
 | B: radiation|   |    |   |    |   |    |
 @end example
 
+When the grid has no legend rows, the table named @samp{This week}
+supplies them. It has the columns Code, Project Number, Project Name,
+Deadline, Risk tag, and Default activity. A row such as
+@samp{| B: | 1006 | AIrxOpt | 2026-12-15 | :safe: | editing |} reads as
+the legend row @samp{B: 1006AIrxOpt 2026-12-15 :safe:}, and its Default
+activity counts as the @samp{@@editing} tag. Legend rows in the grid win.
+
 The parser is tolerant of irregular spacing and of single-digit hours,
 so @samp{9:15 - 10:45}, @samp{04:00-5:30}, and even @samp{15:00-16: 30}
 with a space after the colon are all accepted. A cell letter may be lower

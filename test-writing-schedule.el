@@ -973,5 +973,65 @@ and are used verbatim when set, at call time and in any load order."
     (should (member "GA" labels))
     (should-not (member "GQ" labels))))
 
+;;;; A legend kept in columns
+
+(defconst writing-schedule-test--column-text
+  (concat "| Time | M  | Tu |\n"
+          "|------+----+----|\n"
+          "| 04:00-06:00 | gB | 0 |\n"
+          "| 06:00-07:00 | E  |    |\n"
+          "|------+----+----|\n"
+          "\n"
+          "#+NAME: This week\n"
+          "| Code | Project Number | Project Name | Deadline   | Risk tag | Default activity |\n"
+          "|------+----------------+--------------+------------+----------+------------------|\n"
+          "| 0:   | 8721           | Noahlana     | 2026-10-19 | :safe:   |                  |\n"
+          "| B:   | 1006           | AIrxOpt      |            | risky    |                  |\n"
+          "| E:   |                | email        |            |          | support          |\n"
+          "| -    | 1452           | PHFSboXt     |            | :safe:   |                  |\n")
+  "A week whose legend sits in a This week table in columns.")
+
+(ert-deftest writing-schedule/column-legend/reads-the-rows ()
+  "Each row of the This week table becomes a one-cell legend pair."
+  (should (equal (writing-schedule-column-legend writing-schedule-test--column-text)
+                 '(("0" . "8721Noahlana 2026-10-19 :safe:")
+                   ("B" . "1006AIrxOpt :risky:")
+                   ("E" . "email @support")))))
+
+(ert-deftest writing-schedule/column-legend/parse-text-falls-back ()
+  "A table without legend rows takes the This week legend and its defaults."
+  (let* ((parsed (writing-schedule-parse-text writing-schedule-test--column-text))
+         (sections (mapcar (lambda (e) (cons (plist-get e :letter) (plist-get e :section)))
+                           (plist-get parsed :events))))
+    (should (equal (plist-get parsed :legend)
+                   '(("0" . "8721Noahlana 2026-10-19 :safe:")
+                     ("B" . "1006AIrxOpt :risky:")
+                     ("E" . "email"))))
+    (should (equal (cdr (assoc "E" sections)) "Supporting"))
+    (should (equal (cdr (assoc "B" sections)) "Generative"))))
+
+(ert-deftest writing-schedule/column-legend/one-cell-legend-wins ()
+  "A legend row in the first table is used, and the columns are ignored."
+  (let ((text (replace-regexp-in-string
+               "|------\\+----\\+----|\n\n" "|------+----+----|\n| B: other |  |  |\n\n"
+               writing-schedule-test--column-text)))
+    (should (equal (plist-get (writing-schedule-parse-text text) :legend)
+                   '(("B" . "other"))))))
+
+(ert-deftest writing-schedule/column-legend/at-point ()
+  "The commands that parse the table at point read the columns too."
+  (with-temp-buffer
+    (org-mode)
+    (insert writing-schedule-test--column-text)
+    (goto-char (point-min))
+    (forward-line 2)
+    (should (equal (car (plist-get (writing-schedule--parse-at-point) :legend))
+                   '("0" . "8721Noahlana 2026-10-19 :safe:")))))
+
+(ert-deftest writing-schedule/column-legend/none ()
+  "Text without a This week table gives no column legend."
+  (should-not (writing-schedule-column-legend "| a | b |\n"))
+  (should-not (writing-schedule-column-legend "#+NAME: This week\n| B: x |\n")))
+
 (provide 'test-writing-schedule)
 ;;; test-writing-schedule.el ends here

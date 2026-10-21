@@ -3,7 +3,7 @@
 ;; Author: Blaine Mooers <blaine-mooers@ou.edu>
 ;; Assisted-by: Claude Code:claude-opus-4-8
 ;; Maintainer: Blaine Mooers <blaine-mooers@ou.edu>
-;; Version: 0.5.0
+;; Version: 0.6.0
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: calendar, outlines, convenience
 ;; URL: https://github.com/MooersLab/writing-schedule
@@ -539,8 +539,104 @@ inside a larger org document parses cleanly.  No org buffer is needed."
 (defun writing-schedule-parse-text (text)
   "Parse the first weekly table in the string TEXT.
 Return the same plist as `writing-schedule-parse-table', with the keys
-:events, :legend, :letters, and :columns."
-  (writing-schedule-parse-table (writing-schedule-table-lines-to-lisp text)))
+:events, :legend, :letters, and :columns.  When that table has no legend
+rows, a legend kept in columns in a table named This week is read
+instead; see `writing-schedule-column-legend'."
+  (writing-schedule--add-column-legend
+   (writing-schedule-parse-table (writing-schedule-table-lines-to-lisp text))
+   text))
+
+(defun writing-schedule--parse-at-point ()
+  "Parse the org table at point, reading a This week legend from the buffer.
+This is `writing-schedule-parse-table' on `org-table-to-lisp', with the
+column legend of `writing-schedule-column-legend' when the table at
+point has no legend rows of its own."
+  (writing-schedule--add-column-legend
+   (writing-schedule-parse-table (org-table-to-lisp))
+   (buffer-substring-no-properties (point-min) (point-max))))
+
+;;;; A legend kept in columns
+
+(defconst writing-schedule--risk-tags
+  '(("safe" . "safe") ("risky" . "risky") ("speculative" . "risky"))
+  "Risk words a Risk tag column may hold, and the tag each is written as.")
+
+(defun writing-schedule-column-legend (text)
+  "Return the legend kept in columns in the table named This week in TEXT.
+The table's first row names its columns: Code, Project Number, Project
+Name, Deadline, Risk tag, and Default activity.  Each row becomes the
+\(CODE . DESCRIPTION) pair the one-cell legend row
+B: 1006AIrxOpt 2026-12-15 :safe: would give, with a default activity
+kept as an @tag.  A row whose code is a dash has no code yet and is left
+out.  Return nil when TEXT has no such table.  This is a port of
+`column_legend' in the Python package."
+  (let ((lines (split-string text "\n"))
+        (case-fold-search t)
+        (found nil) (rows '()) (done nil))
+    (dolist (line lines)
+      (unless done
+        (cond
+         ((and (not found)
+               (string-match "\\`[ \t]*#\\+NAME:[ \t]*\\(.*?\\)[ \t]*\\'" line)
+               (string= (downcase (replace-regexp-in-string
+                                   "[ \t]+" " " (match-string 1 line)))
+                        "this week"))
+          (setq found t))
+         ((not found) nil)
+         ((string-prefix-p "#+" (string-trim line)) nil)
+         ((not (string-prefix-p "|" (string-trim line))) (setq done t))
+         ((string-match-p "\\`[ \t]*|[-+]" line) nil)
+         (t (push (writing-schedule-split-row line) rows)))))
+    (setq rows (nreverse rows))
+    (when (and rows (string-prefix-p "code" (downcase (or (car (car rows)) ""))))
+      (let ((legend '()))
+        (dolist (row (cdr rows))
+          (let* ((row (append row (make-list 6 "")))
+                 (code (upcase (string-trim (replace-regexp-in-string ":" "" (nth 0 row)))))
+                 (desc (concat (nth 1 row) (nth 2 row)))
+                 (deadline (replace-regexp-in-string "[ \t]+" "" (nth 3 row)))
+                 (risk (downcase (replace-regexp-in-string "[:() ]" "" (nth 4 row))))
+                 (activity (downcase (string-trim (replace-regexp-in-string "@" "" (nth 5 row)))))
+                 (case-fold-search nil))
+            (when (and (not (string-empty-p code))
+                       (string-match-p (concat "\\`" writing-schedule-code-regexp "\\'") code))
+              (unless (string-empty-p deadline)
+                (setq desc (concat desc " " deadline)))
+              (when (member activity '("generative" "editing" "support"))
+                (setq desc (concat desc " @" activity)))
+              (let ((tag (cdr (assoc risk writing-schedule--risk-tags))))
+                (when tag (setq desc (concat desc " :" tag ":"))))
+              (push (cons code (string-trim desc)) legend))))
+        (nreverse legend)))))
+
+(defun writing-schedule--add-column-legend (parsed text)
+  "Return PARSED with the column legend of TEXT when it has no legend.
+A default activity in the Default activity column gives the section of
+each block of that code whose cell names no activity, as a legend
+default does in the one-cell layout."
+  (if (plist-get parsed :legend)
+      parsed
+    (let ((legend (writing-schedule-column-legend text)))
+      (if (null legend)
+          parsed
+        (let ((defaults '()) (plain '()))
+          (dolist (pair legend)
+            (let ((split (writing-schedule-split-legend-activity (cdr pair))))
+              (unless (assoc (car pair) defaults)
+                (push (cons (car pair)
+                            (cdr (assoc (cdr split)
+                                        writing-schedule-legend-activity-sections)))
+                      defaults))
+              (push (cons (car pair) (car split)) plain)))
+          (plist-put
+           (plist-put parsed :legend (nreverse plain))
+           :events
+           (mapcar (lambda (event)
+                     (let ((default (cdr (assoc (plist-get event :letter) defaults))))
+                       (if (and default (not (plist-get event :activity)))
+                           (plist-put (copy-sequence event) :section default)
+                         event)))
+                   (plist-get parsed :events))))))))
 
 ;;;; Date helpers
 
@@ -796,8 +892,7 @@ the week to schedule."
   (interactive)
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
-  (let* ((table (org-table-to-lisp))
-         (parsed (writing-schedule-parse-table table))
+  (let* ((parsed (writing-schedule--parse-at-point))
          (events (plist-get parsed :events))
          (letters (plist-get parsed :letters))
          (legend (plist-get parsed :legend)))
@@ -858,7 +953,7 @@ for one day."
   (interactive)
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
-  (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
+  (let* ((parsed (writing-schedule--parse-at-point))
          (all-events (plist-get parsed :events)))
     (unless all-events
       (user-error "No filled time blocks found in this table"))
@@ -903,7 +998,7 @@ that clashes with a block in another group for the same day."
   (interactive)
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
-  (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
+  (let* ((parsed (writing-schedule--parse-at-point))
          (conflicts (writing-schedule-overlaps (plist-get parsed :events))))
     (if (null conflicts)
         (message "No overlapping time blocks in this table")
@@ -1225,7 +1320,7 @@ Meant to be called from a shell through Emacs --batch."
       (goto-char (point-min))
       (unless (re-search-forward "^[ \t]*|" nil t)
         (error "No org table found in %s" table))
-      (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
+      (let* ((parsed (writing-schedule--parse-at-point))
              (events (plist-get parsed :events)))
         (unless events
           (error "No filled time blocks found in %s" table))
@@ -1268,7 +1363,7 @@ Emacs --batch."
       (goto-char (point-min))
       (unless (re-search-forward "^[ \t]*|" nil t)
         (error "No org table found in %s" table))
-      (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
+      (let* ((parsed (writing-schedule--parse-at-point))
              (all-events (plist-get parsed :events)))
         (unless all-events
           (error "No filled time blocks found in %s" table))
@@ -1728,7 +1823,7 @@ when a LaTeX compiler is available."
   (interactive "P")
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
-  (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp))))
+  (let* ((parsed (writing-schedule--parse-at-point)))
     (unless (writing-schedule--guard-overlaps (plist-get parsed :events))
       (user-error "Aborted because of overlapping time blocks; fix them and retry"))
     (let* ((format (intern (completing-read "Output (pdf, org, both): "
@@ -1754,7 +1849,7 @@ compiler is available."
   (interactive)
   (unless (org-at-table-p)
     (user-error "Point is not in an org table.  Move into your schedule table first"))
-  (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
+  (let* ((parsed (writing-schedule--parse-at-point))
          (format (intern (completing-read "Output (pdf, org, both): "
                                           '("pdf" "org" "both") nil t nil nil "both")))
          (day-abs (writing-schedule--abs-from-time
@@ -1786,7 +1881,7 @@ them.  Meant to be called from a shell through `emacs --batch'."
       (goto-char (point-min))
       (unless (re-search-forward "^[ \t]*|" nil t)
         (error "No org table found in %s" table))
-      (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
+      (let* ((parsed (writing-schedule--parse-at-point))
              (monday (writing-schedule-week-monday (org-read-date nil t week)))
              (dir (if (and out-dir (not (string-empty-p out-dir)))
                       (expand-file-name out-dir)
@@ -1817,7 +1912,7 @@ written and return them.  Meant to be called from a shell through
       (goto-char (point-min))
       (unless (re-search-forward "^[ \t]*|" nil t)
         (error "No org table found in %s" table))
-      (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
+      (let* ((parsed (writing-schedule--parse-at-point))
              (day-abs (writing-schedule--day-abs day))
              (monday (writing-schedule--monday-of-abs day-abs))
              (dir (if (and out-dir (not (string-empty-p out-dir)))
@@ -1848,7 +1943,7 @@ non-zero exit."
       (goto-char (point-min))
       (unless (re-search-forward "^[ \t]*|" nil t)
         (error "No org table found in %s" table))
-      (let* ((parsed (writing-schedule-parse-table (org-table-to-lisp)))
+      (let* ((parsed (writing-schedule--parse-at-point))
              (conflicts (writing-schedule-overlaps (plist-get parsed :events))))
         (if (null conflicts)
             (progn (princ (format "No overlapping time blocks in %s\n" table)) nil)
