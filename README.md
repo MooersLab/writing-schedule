@@ -224,6 +224,8 @@ Each row reads as the legend row `B: 1006AIrxOpt 2026-12-15 :safe:`, and
 the Default activity column counts as the `@editing` tag. Legend rows in
 the grid itself still win.
 
+A legend description may end with a risk tag, `:safe:` or `:risky:`. The scheduler reads the tag as part of the description and gives it no meaning of its own. The companion package writing-habit reads it to split the week into safe and speculative work. writing-habit also labels time that your tracker logs on a writing project that is in neither the week's legend nor the semester project lists kept below the table. It calls that work risky prospecting, because unplanned exploratory work is the most likely to be abandoned for lack of time. Putting a project in the legend, or on a semester list, is what makes it planned work.
+
 ### 3. Generate the schedule
 
 Put point anywhere inside the table and run:
