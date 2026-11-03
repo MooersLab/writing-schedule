@@ -9,16 +9,11 @@
 ![Apple Calendar](https://img.shields.io/badge/Apple_Calendar-import-000000?logo=apple&logoColor=white)
 ![Outlook](https://img.shields.io/badge/Outlook-import-0078D4?logo=microsoftoutlook&logoColor=white)
 
-`writing-schedule.el` turns a weekly writing-block table into org agenda
-events and an iCalendar file you can import into Outlook Web or any
-calendar application. It also exports the week's schedule to a PDF for
-printing to paper to track in ink the dynamic nature of what actually
-gets done. Run it from inside Emacs for use with org-agenda, or for
-non-Emacs users, from the shell with a bash script for use with iCal,
-Google Calendar, or Outlook Calendar. Originally designed to schedule
-writing, but it can be used for any recurring activity, like writing
-code, working on email, yard work, exercising, buying groceries, and so
-on. Rare events are best added manually to the calendar.
+`writing-schedule.el` turns a weekly writing-block table into org-agenda events and an iCalendar file you can import into Outlook Web or any electronic calendar application. 
+It also exports the week's schedule to a PDF for printing on paper to track in ink the dynamic nature of what actually gets done. 
+Run it from inside Emacs for use with org-agenda, or, for non-Emacs users, run it from the shell with a bash script for use with iCal, Google Calendar, or Outlook Calendar. 
+Originally designed to schedule writing, but it can be used for any recurring activity, like writing code, working on email, yard work, exercising, buying groceries, and so on. 
+Add rare events manually to the calendar.
 
 You keep a weekly plan as an org table. Each row is a time block, each
 column after the first is a day, and each filled cell holds a short
